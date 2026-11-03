@@ -19,9 +19,16 @@ type S3Client struct {
 }
 
 func NewS3Client(server *server.Server, cfg aws.Config) *S3Client {
+	var s3Options []func(*s3.Options)
+	if server.Config.AWS.EndpointURL != "" {
+		s3Options = append(s3Options, func(o *s3.Options) {
+			o.UsePathStyle = true
+		})
+	}
+
 	return &S3Client{
 		server: server,
-		client: s3.NewFromConfig(cfg),
+		client: s3.NewFromConfig(cfg, s3Options...),
 	}
 }
 

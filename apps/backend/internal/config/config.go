@@ -195,17 +195,34 @@ func LoadConfig() (*Config, error) {
 		logger.Fatal().Err(err).Msg("could not unmarshal main config")
 	}
 
-	validate := validator.New()
-
-	err = validate.Struct(mainConfig)
-	if err != nil {
-		logger.Fatal().Err(err).Msg("config validation failed")
-	} else {
-		logger.Info().Msg("config validation passed")
-	}
-
 	if mainConfig.Observability == nil {
 		mainConfig.Observability = DefaultObservabilityConfig()
+	} else {
+		def := DefaultObservabilityConfig()
+		if mainConfig.Observability.ServiceName == "" {
+			mainConfig.Observability.ServiceName = def.ServiceName
+		}
+		if mainConfig.Observability.Environment == "" {
+			mainConfig.Observability.Environment = def.Environment
+		}
+		if mainConfig.Observability.Logging.Level == "" {
+			mainConfig.Observability.Logging.Level = def.Logging.Level
+		}
+		if mainConfig.Observability.Logging.Format == "" {
+			mainConfig.Observability.Logging.Format = def.Logging.Format
+		}
+		if mainConfig.Observability.Logging.SlowQueryThreshold == 0 {
+			mainConfig.Observability.Logging.SlowQueryThreshold = def.Logging.SlowQueryThreshold
+		}
+		if mainConfig.Observability.HealthChecks.Interval == 0 {
+			mainConfig.Observability.HealthChecks.Interval = def.HealthChecks.Interval
+		}
+		if mainConfig.Observability.HealthChecks.Timeout == 0 {
+			mainConfig.Observability.HealthChecks.Timeout = def.HealthChecks.Timeout
+		}
+		if len(mainConfig.Observability.HealthChecks.Checks) == 0 {
+			mainConfig.Observability.HealthChecks.Checks = def.HealthChecks.Checks
+		}
 	}
 
 	mainConfig.Observability.ServiceName = "taskify"
@@ -217,6 +234,15 @@ func LoadConfig() (*Config, error) {
 
 	if mainConfig.Cron == nil {
 		mainConfig.Cron = DefaultCronConfig()
+	}
+
+	validate := validator.New()
+
+	err = validate.Struct(mainConfig)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("config validation failed")
+	} else {
+		logger.Info().Msg("config validation passed")
 	}
 
 	return mainConfig, nil

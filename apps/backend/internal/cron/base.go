@@ -35,11 +35,11 @@ func NewJobContext() (*JobContext, error) {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
-	redisClient := redis.NewClient(&redis.Options{
-		Addr:     cfg.Redis.Address,
-		Password: cfg.Redis.Password,
-		DB:       0,
-	})
+	redisOptions, _, err := database.ParseRedisConfig(cfg.Redis.Address, cfg.Redis.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse redis configuration: %w", err)
+	}
+	redisClient := redis.NewClient(redisOptions)
 
 	srv := &server.Server{
 		Config:        cfg,
@@ -81,13 +81,12 @@ func (c *JobContext) Close() {
 }
 
 func initJobClient(cfg *config.Config) (*asynq.Client, error) {
-	redisOpt := asynq.RedisClientOpt{
-		Addr:     cfg.Redis.Address,
-		Password: cfg.Redis.Password,
-		DB:       0,
+	_, asynqOpt, err := database.ParseRedisConfig(cfg.Redis.Address, cfg.Redis.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse redis configuration for jobs: %w", err)
 	}
 
-	client := asynq.NewClient(redisOpt)
+	client := asynq.NewClient(asynqOpt)
 	return client, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 	"github.com/faizan1250/taskify/internal/config"
+	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/lib/email"
 )
 
@@ -22,16 +23,16 @@ type AuthServiceInterface interface {
 }
 
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
-	redisAddr := cfg.Redis.Address
+	_, asynqOpt, err := database.ParseRedisConfig(cfg.Redis.Address, cfg.Redis.Password)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to parse redis configuration for jobs")
+		asynqOpt = asynq.RedisClientOpt{Addr: cfg.Redis.Address, Password: cfg.Redis.Password}
+	}
 
-	client := asynq.NewClient(asynq.RedisClientOpt{
-		Addr:     redisAddr,
-		Password: cfg.Redis.Password,
-		DB:       0,
-	})
+	client := asynq.NewClient(asynqOpt)
 
 	server := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr, Password: cfg.Redis.Password, DB: 0},
+		asynqOpt,
 		asynq.Config{
 			Concurrency: 10,
 			Queues: map[string]int{

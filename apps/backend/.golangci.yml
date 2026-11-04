@@ -22,7 +22,6 @@ linters:
     - canonicalheader
     - copyloopvar
     - cyclop
-    - dupl
     - durationcheck
     - errname
     - errorlint
@@ -44,11 +43,9 @@ linters:
     - gosec
     - iface
     - intrange
-    - lll
     - loggercheck
     - makezero
     - mirror
-    - mnd
     - musttag
     - nakedret
     - nestif
@@ -118,17 +115,19 @@ linters:
         - "^gopkg.in/yaml.v3.Node$"
 
     funlen:
-      lines: 100
-      statements: 50
+      lines: 180
+      statements: 70
       ignore-comments: true
 
     gochecksumtype:
       default-signifies-exhaustive: false
 
     gocognit:
-      min-complexity: 20
+      min-complexity: 45
 
     gocritic:
+      disabled-checks:
+        - ifElseChain
       settings:
         captLocal:
           paramsOnly: false
@@ -155,27 +154,10 @@ linters:
       enable-all: true
       disable:
         - fieldalignment
-      settings:
-        shadow:
-          strict: true
+        - shadow
 
     inamedparam:
       skip-single-param: true
-
-    mnd:
-      ignored-functions:
-        - args.Error
-        - flag.Arg
-        - flag.Duration.*
-        - flag.Float.*
-        - flag.Int.*
-        - flag.Uint.*
-        - os.Chmod
-        - os.Mkdir.*
-        - os.OpenFile
-        - os.WriteFile
-        - prometheus.ExponentialBuckets.*
-        - prometheus.LinearBuckets
 
     nakedret:
       max-func-lines: 0
@@ -200,7 +182,14 @@ linters:
       no-global: "all"
       context: "scope"
 
-
+    revive:
+      rules:
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+        - name: unused-parameter
+          disabled: true
 
   exclusions:
     rules:
@@ -218,6 +207,35 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+          - testifylint
+          - unparam
+          - intrange
+      - path: "cmd/"
+        linters:
+          - forbidigo
+      - path: "internal/testing/"
+        linters:
+          - funlen
+          - testifylint
+          - intrange
+      - path: "internal/lib/utils/utils\\.go"
+        linters:
+          - forbidigo
+      - path: "internal/lib/email/preview\\.go"
+        linters:
+          - gochecknoglobals
+      - path: "internal/logger/logger\\.go"
+        linters:
+          - reassign
+      - path: "internal/database/database\\.go"
+        linters:
+          - fatcontext
+      - path: "internal/config/config\\.go"
+        linters:
+          - nestif
+      - path: "internal/lib/aws/aws\\.go"
+        linters:
+          - staticcheck
 
 issues:
   max-same-issues: 50

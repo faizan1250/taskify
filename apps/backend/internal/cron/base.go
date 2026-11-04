@@ -3,6 +3,7 @@ package cron
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
@@ -116,11 +117,33 @@ func NewJobRunner(job Job) (*JobRunner, error) {
 func (r *JobRunner) Run() error {
 	defer r.ctx.Close()
 
+	ctx := context.Background()
+
+	if r.ctx.Server.Redis != nil {
+		lockKey := fmt.Sprintf("cron:lock:%s", r.job.Name())
+		locked, err := r.ctx.Server.Redis.SetNX(ctx, lockKey, "locked", 5*time.Minute).Result()
+		if err != nil {
+			r.ctx.Server.Logger.Error().
+				Err(err).
+				Str("job", r.job.Name()).
+				Msg("Failed to check/acquire distributed lock")
+			return fmt.Errorf("failed to acquire distributed lock: %w", err)
+		}
+		if !locked {
+			r.ctx.Server.Logger.Info().
+				Str("job", r.job.Name()).
+				Msg("Cron job is already running on another instance, skipping execution")
+			return nil
+		}
+		defer func() {
+			_ = r.ctx.Server.Redis.Del(context.Background(), lockKey).Err()
+		}()
+	}
+
 	r.ctx.Server.Logger.Info().
 		Str("job", r.job.Name()).
 		Msg("Starting cron job")
 
-	ctx := context.Background()
 	err := r.job.Run(ctx, r.ctx)
 	if err != nil {
 		r.ctx.Server.Logger.Error().

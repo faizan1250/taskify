@@ -82,58 +82,48 @@ func (r *TodoRepository) GetTodoByID(ctx context.Context, userID string, todoID 
 	SELECT
 		t.*,
 		CASE
-			WHEN c.id IS NOT NULL THEN to_jsonb(camel (c))
+			WHEN c.id IS NOT NULL THEN to_jsonb(camel(c))
 			ELSE NULL
 		END AS category,
 		COALESCE(
-			jsonb_agg(
-				to_jsonb(camel (child))
-				ORDER BY
-					child.sort_order ASC,
-					child.created_at ASC
-			) FILTER (
-				WHERE
-					child.id IS NOT NULL
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(child))
+					ORDER BY child.sort_order ASC, child.created_at ASC
+				)
+				FROM todos child
+				WHERE child.parent_todo_id = t.id AND child.user_id = @user_id
 			),
-			'[]'::JSONB
+			'[]'::jsonb
 		) AS children,
 		COALESCE(
-			jsonb_agg(
-				to_jsonb(camel (com))
-				ORDER BY
-					com.created_at ASC
-			) FILTER (
-				WHERE
-					com.id IS NOT NULL
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(com))
+					ORDER BY com.created_at ASC
+				)
+				FROM todo_comments com
+				WHERE com.todo_id = t.id AND com.user_id = @user_id
 			),
-			'[]'::JSONB
+			'[]'::jsonb
 		) AS comments,
-		 COALESCE(
-				jsonb_agg(
-					to_jsonb(camel (att))
-					ORDER BY
-						att.created_at DESC
-				) FILTER (
-					WHERE
-						att.id IS NOT NULL
-				),
-				'[]'::JSONB
-			) AS attachments
+		COALESCE(
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(att))
+					ORDER BY att.created_at DESC
+				)
+				FROM todo_attachments att
+				WHERE att.todo_id = t.id
+			),
+			'[]'::jsonb
+		) AS attachments
 	FROM
 		todos t
-		LEFT JOIN todo_categories c ON c.id=t.category_id
-		AND c.user_id=@user_id
-		LEFT JOIN todos child ON child.parent_todo_id=t.id
-		AND child.user_id=@user_id
-		LEFT JOIN todo_comments com ON com.todo_id=t.id
-		AND com.user_id=@user_id
-		LEFT JOIN todo_attachments att ON att.todo_id=t.id
+		LEFT JOIN todo_categories c ON c.id = t.category_id AND c.user_id = @user_id
 	WHERE
-		t.id=@id
-		AND t.user_id=@user_id
-	GROUP BY
-		t.id,
-		c.id
+		t.id = @id
+		AND t.user_id = @user_id
 `
 
 	rows, err := r.server.DB.Pool.Query(ctx, stmt, pgx.NamedArgs{
@@ -184,52 +174,45 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 	SELECT
 		t.*,
 		CASE
-			WHEN c.id IS NOT NULL THEN to_jsonb(camel (c))
+			WHEN c.id IS NOT NULL THEN to_jsonb(camel(c))
 			ELSE NULL
 		END AS category,
 		COALESCE(
-			jsonb_agg(
-				to_jsonb(camel (child))
-				ORDER BY
-					child.sort_order ASC,
-					child.created_at ASC
-			) FILTER (
-				WHERE
-					child.id IS NOT NULL
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(child))
+					ORDER BY child.sort_order ASC, child.created_at ASC
+				)
+				FROM todos child
+				WHERE child.parent_todo_id = t.id AND child.user_id = @user_id
 			),
-			'[]'::JSONB
+			'[]'::jsonb
 		) AS children,
 		COALESCE(
-			jsonb_agg(
-				to_jsonb(camel (com))
-				ORDER BY
-					com.created_at ASC
-			) FILTER (
-				WHERE
-					com.id IS NOT NULL
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(com))
+					ORDER BY com.created_at ASC
+				)
+				FROM todo_comments com
+				WHERE com.todo_id = t.id AND com.user_id = @user_id
 			),
-			'[]'::JSONB
+			'[]'::jsonb
 		) AS comments,
 		COALESCE(
-				jsonb_agg(
-					to_jsonb(camel (att))
-					ORDER BY
-						att.created_at DESC
-				) FILTER (
-					WHERE
-						att.id IS NOT NULL
-				),
-				'[]'::JSONB
-			) AS attachments
+			(
+				SELECT jsonb_agg(
+					to_jsonb(camel(att))
+					ORDER BY att.created_at DESC
+				)
+				FROM todo_attachments att
+				WHERE att.todo_id = t.id
+			),
+			'[]'::jsonb
+		) AS attachments
 	FROM
 		todos t
-		LEFT JOIN todo_categories c ON c.id=t.category_id
-		AND c.user_id=@user_id
-		LEFT JOIN todos child ON child.parent_todo_id=t.id
-		AND child.user_id=@user_id
-		LEFT JOIN todo_comments com ON com.todo_id=t.id
-		AND com.user_id=@user_id
-		LEFT JOIN todo_attachments att ON att.todo_id=t.id
+		LEFT JOIN todo_categories c ON c.id = t.category_id AND c.user_id = @user_id
 `
 
 	args := pgx.NamedArgs{
@@ -301,8 +284,6 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total count for todos user_id=%s: %w", userID, err)
 	}
-
-	stmt += " GROUP BY t.id, c.id"
 
 	if query.Sort != nil {
 		stmt += " ORDER BY t." + *query.Sort

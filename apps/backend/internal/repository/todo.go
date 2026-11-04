@@ -365,7 +365,7 @@ func (r *TodoRepository) UpdateTodo(ctx context.Context, userID string, payload 
 	}
 
 	if payload.DueDate != nil {
-		setClauses = append(setClauses, "due_date = @due_date")
+		setClauses = append(setClauses, "due_date = @due_date", "reminder_sent_at = NULL", "overdue_notified_at = NULL")
 		args["due_date"] = *payload.DueDate
 	}
 
@@ -640,6 +640,7 @@ func (r *TodoRepository) GetTodosDueInHours(ctx context.Context, hours int, limi
 			AND due_date > NOW()
 			AND due_date <= NOW() + INTERVAL '%d hours'
 			AND status NOT IN ('completed', 'archived')
+			AND reminder_sent_at IS NULL
 		ORDER BY
 			due_date ASC
 		LIMIT
@@ -673,6 +674,7 @@ func (r *TodoRepository) GetOverdueTodos(ctx context.Context, limit int) ([]todo
 			due_date IS NOT NULL
 			AND due_date < NOW()
 			AND status NOT IN ('completed', 'archived')
+			AND overdue_notified_at IS NULL
 		ORDER BY
 			due_date ASC
 		LIMIT
@@ -935,4 +937,60 @@ func (r *TodoRepository) GetOverdueTodosForUser(ctx context.Context, userID stri
 	}
 
 	return overdueTodos, nil
+}
+
+func (r *TodoRepository) MarkDueDateReminderSent(ctx context.Context, todoID uuid.UUID) error {
+	stmt := `
+		UPDATE todos
+		SET
+			reminder_sent_at = NOW()
+		WHERE
+			id = @id
+	`
+	_, err := r.server.DB.Pool.Exec(ctx, stmt, pgx.NamedArgs{
+		"id": todoID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to mark due date reminder sent for todo %s: %w", todoID, err)
+	}
+	return nil
+}
+
+func (r *TodoRepository) MarkOverdueNotificationSent(ctx context.Context, todoID uuid.UUID) error {
+	stmt := `
+		UPDATE todos
+		SET
+			overdue_notified_at = NOW()
+		WHERE
+			id = @id
+	`
+	_, err := r.server.DB.Pool.Exec(ctx, stmt, pgx.NamedArgs{
+		"id": todoID,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to mark overdue notification sent for todo %s: %w", todoID, err)
+	}
+	return nil
+}
+
+func (r *TodoRepository) GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error) {
+	stmt := `
+		SELECT
+			status
+		FROM
+			todos
+		WHERE
+			id = @id
+	`
+	var status string
+	err := r.server.DB.Pool.QueryRow(ctx, stmt, pgx.NamedArgs{
+		"id": id,
+	}).Scan(&status)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", errs.NewNotFoundError("todo not found", false, nil)
+		}
+		return "", fmt.Errorf("failed to get todo status for todo %s: %w", id, err)
+	}
+	return status, nil
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/faizan1250/taskify/internal/errs"
+	"github.com/faizan1250/taskify/internal/lib/aws"
 	"github.com/faizan1250/taskify/internal/service"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -271,5 +272,96 @@ func TestDeleteTodoAttachment_PanicRecovery(t *testing.T) {
 
 		wg.Wait()
 		assert.Equal(t, "simulated S3 client panic", recovered)
+	})
+}
+
+func TestDeleteTodo_S3Cleanup_NilSafety(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("nil awsClient does not panic", func(t *testing.T) {
+		svc := &service.TodoService{}
+		assert.NotPanics(t, func() {
+			svc.CleanupS3AttachmentsAsync(ctx, []string{"key-1", "key-2"})
+		})
+	})
+
+	t.Run("nil S3 client does not panic", func(t *testing.T) {
+		svc := service.NewTodoService(nil, nil, nil, &aws.AWS{S3: nil})
+		assert.NotPanics(t, func() {
+			svc.CleanupS3AttachmentsAsync(ctx, []string{"key-1", "key-2"})
+		})
+	})
+
+	t.Run("empty attachment keys slice does not spawn or panic", func(t *testing.T) {
+		svc := &service.TodoService{}
+		assert.NotPanics(t, func() {
+			svc.CleanupS3AttachmentsAsync(ctx, []string{})
+		})
+	})
+
+	t.Run("nil attachment keys does not panic", func(t *testing.T) {
+		svc := &service.TodoService{}
+		assert.NotPanics(t, func() {
+			svc.CleanupS3AttachmentsAsync(ctx, nil)
+		})
+	})
+}
+
+func TestDeleteTodo_S3Cleanup_ContextDetachment(t *testing.T) {
+	t.Run("parent context cancellation does not cancel detached background context for DeleteTodo", func(t *testing.T) {
+		parentCtx, parentCancel := context.WithCancel(context.Background())
+		const key testContextKey = "request_id"
+		ctxWithValue := context.WithValue(parentCtx, key, "req-delete-todo-456")
+
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctxWithValue), 30*time.Second)
+		defer cancel()
+
+		parentCancel()
+
+		require.ErrorIs(t, ctxWithValue.Err(), context.Canceled)
+		assert.NoError(t, bgCtx.Err())
+		assert.Equal(t, "req-delete-todo-456", bgCtx.Value(key))
+
+		deadline, hasDeadline := bgCtx.Deadline()
+		assert.True(t, hasDeadline)
+		assert.WithinDuration(t, time.Now().Add(30*time.Second), deadline, 2*time.Second)
+	})
+
+	t.Run("detached context times out after specified duration", func(t *testing.T) {
+		parentCtx, parentCancel := context.WithCancel(context.Background())
+		parentCancel()
+
+		shortTimeoutCtx, cancel := context.WithTimeout(context.WithoutCancel(parentCtx), 10*time.Millisecond)
+		defer cancel()
+
+		time.Sleep(25 * time.Millisecond)
+		assert.ErrorIs(t, shortTimeoutCtx.Err(), context.DeadlineExceeded)
+	})
+}
+
+func TestDeleteTodo_S3Cleanup_PanicRecovery(t *testing.T) {
+	t.Run("recovers panic when deleting multiple keys in background", func(t *testing.T) {
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		var recovered any
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if r := recover(); r != nil {
+					recovered = r
+				}
+			}()
+
+			keys := []string{"key-1", "key-2", "key-3"}
+			for i, k := range keys {
+				if i == 1 {
+					panic(fmt.Sprintf("simulated S3 failure deleting %s", k))
+				}
+			}
+		}()
+
+		wg.Wait()
+		assert.Equal(t, "simulated S3 failure deleting key-2", recovered)
 	})
 }

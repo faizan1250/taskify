@@ -178,12 +178,21 @@ func (s *TodoService) UpdateTodo(ctx echo.Context, userID string, payload *todo.
 
 func (s *TodoService) DeleteTodo(ctx echo.Context, userID string, todoID uuid.UUID) error {
 	logger := middleware.GetLogger(ctx)
+	reqCtx := ctx.Request().Context()
 
-	err := s.todoRepo.DeleteTodo(ctx.Request().Context(), userID, todoID)
+	attachmentKeys, err := s.todoRepo.GetAttachmentKeysForTodoAndSubtasks(reqCtx, userID, todoID)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to get attachment keys for todo and subtasks")
+		return err
+	}
+
+	err = s.todoRepo.DeleteTodo(reqCtx, userID, todoID)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to delete todo")
 		return err
 	}
+
+	s.CleanupS3AttachmentsAsync(reqCtx, attachmentKeys)
 
 	// Business event log
 	eventLogger := middleware.GetLogger(ctx)
@@ -193,6 +202,37 @@ func (s *TodoService) DeleteTodo(ctx echo.Context, userID string, todoID uuid.UU
 		Msg("Todo deleted successfully")
 
 	return nil
+}
+
+func (s *TodoService) CleanupS3AttachmentsAsync(reqCtx context.Context, keys []string) {
+	if len(keys) == 0 || s.awsClient == nil || s.awsClient.S3 == nil {
+		return
+	}
+
+	bucket := ""
+	if s.server != nil && s.server.Config != nil {
+		bucket = s.server.Config.AWS.UploadBucket
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil && s.server != nil {
+				s.server.Logger.Error().Interface("panic", r).Msg("recovered panic in S3 attachment deletion")
+			}
+		}()
+
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
+		defer cancel()
+
+		for _, key := range keys {
+			if err := s.awsClient.S3.DeleteObject(bgCtx, bucket, key); err != nil && s.server != nil {
+				s.server.Logger.Error().
+					Err(err).
+					Str("s3_key", key).
+					Msg("failed to delete attachment from S3")
+			}
+		}
+	}()
 }
 
 func (s *TodoService) GetTodoStats(ctx echo.Context, userID string) (*todo.TodoStats, error) {

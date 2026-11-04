@@ -303,6 +303,30 @@ func (s *TodoService) UploadTodoAttachment(
 	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to create attachment record")
+
+		reqCtx := ctx.Request().Context()
+		bucket := s.server.Config.AWS.UploadBucket
+		cleanupKey := s3Key
+
+		// Delete orphaned upload from S3 asynchronously using detached context
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					s.server.Logger.Error().Interface("panic", r).Msg("recovered panic in S3 attachment rollback cleanup")
+				}
+			}()
+
+			bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
+			defer cancel()
+
+			if cleanErr := s.awsClient.S3.DeleteObject(bgCtx, bucket, cleanupKey); cleanErr != nil {
+				s.server.Logger.Error().
+					Err(cleanErr).
+					Str("s3_key", cleanupKey).
+					Msg("failed to cleanup orphaned attachment from S3 after DB failure")
+			}
+		}()
+
 		return nil, err
 	}
 

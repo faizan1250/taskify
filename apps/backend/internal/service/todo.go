@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/lib/aws"
@@ -317,17 +319,30 @@ func (s *TodoService) DeleteTodoAttachment(
 		return err
 	}
 
+	reqCtx := ctx.Request().Context()
+	downloadKey := attachment.DownloadKey
+	bucket := s.server.Config.AWS.UploadBucket
+
 	// Delete from S3 asynchronously
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.server.Logger.Error().Interface("panic", r).Msg("recovered panic in S3 attachment deletion")
+			}
+		}()
+
+		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
+		defer cancel()
+
 		err := s.awsClient.S3.DeleteObject(
-			ctx.Request().Context(),
-			s.server.Config.AWS.UploadBucket,
-			attachment.DownloadKey,
+			bgCtx,
+			bucket,
+			downloadKey,
 		)
 		if err != nil {
 			s.server.Logger.Error().
 				Err(err).
-				Str("s3_key", attachment.DownloadKey).
+				Str("s3_key", downloadKey).
 				Msg("failed to delete attachment from S3")
 		}
 	}()

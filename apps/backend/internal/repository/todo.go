@@ -575,6 +575,42 @@ func (r *TodoRepository) DeleteTodoAttachment(
 	return nil
 }
 
+func (r *TodoRepository) GetAttachmentKeysForTodoAndSubtasks(
+	ctx context.Context,
+	userID string,
+	todoID uuid.UUID,
+) ([]string, error) {
+	stmt := `
+		SELECT
+			att.download_key
+		FROM
+			todo_attachments att
+			JOIN todos t ON t.id = att.todo_id
+		WHERE
+			(t.id = @todo_id OR t.parent_todo_id = @todo_id)
+			AND t.user_id = @user_id
+	`
+
+	rows, err := r.server.DB.Pool.Query(ctx, stmt, pgx.NamedArgs{
+		"todo_id": todoID,
+		"user_id": userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get attachment keys for todo and subtasks: %w", err)
+	}
+
+	keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect attachment keys: %w", err)
+	}
+
+	if keys == nil {
+		return []string{}, nil
+	}
+
+	return keys, nil
+}
+
 func (r *TodoRepository) UploadTodoAttachment(
 	ctx context.Context,
 	todoID uuid.UUID,

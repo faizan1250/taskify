@@ -6,6 +6,7 @@ import (
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/lib/email"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 )
@@ -15,11 +16,16 @@ type JobService struct {
 	server      *asynq.Server
 	logger      *zerolog.Logger
 	authService AuthServiceInterface
+	todoRepo    TodoRepositoryInterface
 	emailClient *email.Client
 }
 
 type AuthServiceInterface interface {
 	GetUserEmail(ctx context.Context, userID string) (string, error)
+}
+
+type TodoRepositoryInterface interface {
+	GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error)
 }
 
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
@@ -52,6 +58,10 @@ func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {
 
 func (j *JobService) SetAuthService(authService AuthServiceInterface) {
 	j.authService = authService
+}
+
+func (j *JobService) SetTodoRepository(todoRepo TodoRepositoryInterface) {
+	j.todoRepo = todoRepo
 }
 
 func (j *JobService) Start() error {

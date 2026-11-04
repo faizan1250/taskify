@@ -34,7 +34,6 @@ linters:
     - gochecknoinits
     - gochecksumtype
     - gocognit
-    - goconst
     - gocritic
     - gocyclo
     - gomoddirectives

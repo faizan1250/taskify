@@ -4,9 +4,6 @@ import (
 	"mime/multipart"
 	"net/http"
 
-	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/lib/aws"
 	"github.com/faizan1250/taskify/internal/middleware"
@@ -14,6 +11,9 @@ import (
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/repository"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/google/uuid"
+	"github.com/labstack/echo/v4"
+	"github.com/pkg/errors"
 )
 
 type TodoService struct {

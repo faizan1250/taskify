@@ -3,13 +3,13 @@ package handler
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
 	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/middleware"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/server"
 	"github.com/faizan1250/taskify/internal/service"
+	"github.com/labstack/echo/v4"
 )
 
 type TodoHandler struct {

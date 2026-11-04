@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/v9"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/logger"
 	"github.com/faizan1250/taskify/internal/repository"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 )
 
 type JobContext struct {

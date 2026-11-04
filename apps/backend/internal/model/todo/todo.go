@@ -3,10 +3,10 @@ package todo
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/category"
 	"github.com/faizan1250/taskify/internal/model/comment"
+	"github.com/google/uuid"
 )
 
 type Status string

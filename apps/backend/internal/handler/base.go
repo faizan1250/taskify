@@ -3,12 +3,12 @@ package handler
 import (
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/newrelic/go-agent/v3/integrations/nrpkgerrors"
-	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/faizan1250/taskify/internal/middleware"
 	"github.com/faizan1250/taskify/internal/server"
 	"github.com/faizan1250/taskify/internal/validation"
+	"github.com/labstack/echo/v4"
+	"github.com/newrelic/go-agent/v3/integrations/nrpkgerrors"
+	"github.com/newrelic/go-agent/v3/newrelic"
 )
 
 // Handler provides base functionality for all handlers

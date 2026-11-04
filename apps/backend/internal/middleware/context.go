@@ -3,11 +3,11 @@ package middleware
 import (
 	"context"
 
+	"github.com/faizan1250/taskify/internal/logger"
+	"github.com/faizan1250/taskify/internal/server"
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog"
-	"github.com/faizan1250/taskify/internal/logger"
-	"github.com/faizan1250/taskify/internal/server"
 )
 
 const (

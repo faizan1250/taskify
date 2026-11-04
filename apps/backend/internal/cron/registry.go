@@ -56,7 +56,7 @@ func (r *JobRegistry) Help() string {
 
 	for _, name := range r.List() {
 		job := r.jobs[name]
-		help.WriteString(fmt.Sprintf("  %-*s - %s\n", maxLen, name, job.Description()))
+		fmt.Fprintf(&help, "  %-*s - %s\n", maxLen, name, job.Description())
 	}
 
 	return help.String()

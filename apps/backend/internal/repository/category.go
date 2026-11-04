@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/category"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type CategoryRepository struct {
@@ -203,7 +203,7 @@ func (r *CategoryRepository) UpdateCategory(ctx context.Context, userID string,
 	}
 
 	if len(setClauses) == 0 {
-		return nil, fmt.Errorf("no fields to update")
+		return nil, errors.New("no fields to update")
 	}
 
 	stmt += strings.Join(setClauses, ", ")
@@ -235,7 +235,7 @@ func (r *CategoryRepository) DeleteCategory(ctx context.Context, userID string, 
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("category not found")
+		return errors.New("category not found")
 	}
 
 	return nil

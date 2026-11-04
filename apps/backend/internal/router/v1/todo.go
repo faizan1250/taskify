@@ -1,9 +1,9 @@
 package v1
 
 import (
-	"github.com/labstack/echo/v4"
 	"github.com/faizan1250/taskify/internal/handler"
 	"github.com/faizan1250/taskify/internal/middleware"
+	"github.com/labstack/echo/v4"
 )
 
 func registerTodoRoutes(r *echo.Group, h *handler.TodoHandler, ch *handler.CommentHandler, auth *middleware.AuthMiddleware) {

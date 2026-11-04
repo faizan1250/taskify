@@ -3,10 +3,10 @@ package testing
 import (
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/rs/zerolog"
 )
 
 // CreateTestServer creates a server instance for testing

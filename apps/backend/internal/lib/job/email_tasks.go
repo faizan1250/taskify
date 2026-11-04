@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
-	"github.com/faizan1250/taskify/internal/model/todo"
 )
 
 const (

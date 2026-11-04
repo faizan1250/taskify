@@ -2,12 +2,13 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/faizan1250/taskify/internal/model/comment"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type CommentRepository struct {
@@ -154,7 +155,7 @@ func (r *CommentRepository) DeleteComment(ctx context.Context, userID string, co
 	}
 
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("comment not found")
+		return errors.New("comment not found")
 	}
 
 	return nil

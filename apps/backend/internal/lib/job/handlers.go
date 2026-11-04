@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/lib/email"
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
 )
 
 func (j *JobService) InitHandlers(config *config.Config, logger *zerolog.Logger) {

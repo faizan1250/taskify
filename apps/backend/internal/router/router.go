@@ -3,13 +3,13 @@ package router
 import (
 	"net/http"
 
-	"github.com/labstack/echo/v4"
-	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"github.com/faizan1250/taskify/internal/handler"
 	"github.com/faizan1250/taskify/internal/middleware"
 	v1 "github.com/faizan1250/taskify/internal/router/v1"
 	"github.com/faizan1250/taskify/internal/server"
 	"github.com/faizan1250/taskify/internal/service"
+	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
 )
 

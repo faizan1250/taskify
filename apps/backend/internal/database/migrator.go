@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io/fs"
 	"net"
@@ -51,7 +52,7 @@ func Migrate(ctx context.Context, logger *zerolog.Logger, cfg *config.Config) er
 	}
 	from, err := m.GetCurrentVersion(ctx)
 	if err != nil {
-		return fmt.Errorf("retreiving current database migration version")
+		return errors.New("retreiving current database migration version")
 	}
 	if err := m.Migrate(ctx); err != nil {
 		return err

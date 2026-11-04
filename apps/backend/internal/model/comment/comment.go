@@ -1,8 +1,8 @@
 package comment
 
 import (
-	"github.com/google/uuid"
 	"github.com/faizan1250/taskify/internal/model"
+	"github.com/google/uuid"
 )
 
 type Comment struct {

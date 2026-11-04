@@ -53,7 +53,9 @@ func (mt *multiTracer) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data p
 
 const DatabasePingTimeout = 30
 
-func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerConfig.LoggerService) (*Database, error) {
+// NewPoolConfig creates a pgxpool.Config based on the application configuration,
+// applying connection pool settings and telemetry tracers.
+func NewPoolConfig(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerConfig.LoggerService) (*pgxpool.Config, error) {
 	hostPort := net.JoinHostPort(cfg.Database.Host, strconv.Itoa(cfg.Database.Port))
 
 	// URL-encode the password
@@ -71,12 +73,25 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerConfig
 		return nil, fmt.Errorf("failed to parse pgx pool config: %w", err)
 	}
 
+	if cfg.Database.MaxOpenConns > 0 {
+		pgxPoolConfig.MaxConns = int32(cfg.Database.MaxOpenConns)
+	}
+	if cfg.Database.MaxIdleConns > 0 {
+		pgxPoolConfig.MinConns = int32(cfg.Database.MaxIdleConns)
+	}
+	if cfg.Database.ConnMaxLifetime > 0 {
+		pgxPoolConfig.MaxConnLifetime = time.Duration(cfg.Database.ConnMaxLifetime) * time.Second
+	}
+	if cfg.Database.ConnMaxIdleTime > 0 {
+		pgxPoolConfig.MaxConnIdleTime = time.Duration(cfg.Database.ConnMaxIdleTime) * time.Second
+	}
+
 	// Add New Relic PostgreSQL instrumentation
 	if loggerService != nil && loggerService.GetApplication() != nil {
 		pgxPoolConfig.ConnConfig.Tracer = nrpgx5.NewTracer()
 	}
 
-	if cfg.Primary.Env == "local" {
+	if cfg.Primary.Env == "local" && logger != nil {
 		globalLevel := logger.GetLevel()
 		pgxLogger := loggerConfig.NewPgxLogger(globalLevel)
 		// Chain tracers - New Relic first, then local logging
@@ -95,6 +110,15 @@ func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerConfig
 				LogLevel: tracelog.LogLevel(loggerConfig.GetPgxTraceLogLevel(globalLevel)),
 			}
 		}
+	}
+
+	return pgxPoolConfig, nil
+}
+
+func New(cfg *config.Config, logger *zerolog.Logger, loggerService *loggerConfig.LoggerService) (*Database, error) {
+	pgxPoolConfig, err := NewPoolConfig(cfg, logger, loggerService)
+	if err != nil {
+		return nil, err
 	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), pgxPoolConfig)

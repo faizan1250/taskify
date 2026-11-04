@@ -10,10 +10,13 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type contextKey string
+
 const (
-	UserIDKey   = "user_id"
-	UserRoleKey = "user_role"
-	LoggerKey   = "logger"
+	UserIDKey              = "user_id"
+	UserRoleKey            = "user_role"
+	LoggerKey              = "logger"
+	loggerKey   contextKey = "logger"
 )
 
 type ContextEnhancer struct {
@@ -56,7 +59,7 @@ func (ce *ContextEnhancer) EnhanceContext() echo.MiddlewareFunc {
 			c.Set(LoggerKey, &contextLogger)
 
 			// Create a new context with the logger
-			ctx := context.WithValue(c.Request().Context(), LoggerKey, &contextLogger)
+			ctx := context.WithValue(c.Request().Context(), loggerKey, &contextLogger)
 			c.SetRequest(c.Request().WithContext(ctx))
 
 			return next(c)

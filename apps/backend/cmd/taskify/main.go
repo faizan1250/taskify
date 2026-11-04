@@ -20,6 +20,7 @@ import (
 
 const DefaultContextTimeout = 30
 
+//nolint:gocritic // exitAfterDefer: log.Fatal is used during startup in main
 func main() {
 	cfg, err := config.LoadConfig()
 	if err != nil {

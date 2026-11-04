@@ -59,7 +59,7 @@ func Migrate(ctx context.Context, logger *zerolog.Logger, cfg *config.Config) er
 	if err := m.Migrate(ctx); err != nil {
 		return err
 	}
-	if from == int32(len(m.Migrations)) {
+	if int(from) == len(m.Migrations) {
 		logger.Info().Msgf("database schema up to date, version %d", len(m.Migrations))
 	} else {
 		logger.Info().Msgf("migrated database schema, from %d to %d", from, len(m.Migrations))

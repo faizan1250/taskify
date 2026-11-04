@@ -1,11 +1,9 @@
 package aws
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -32,26 +30,34 @@ func NewS3Client(server *server.Server, cfg aws.Config) *S3Client {
 	}
 }
 
-func (s *S3Client) UploadFile(ctx context.Context, bucket string, fileName string, file io.Reader) (string, error) {
-	fileKey := fmt.Sprintf("%s_%d", fileName, time.Now().Unix())
-
-	var buffer bytes.Buffer
-	_, err := io.Copy(&buffer, file)
-	if err != nil {
-		return "", fmt.Errorf("failed to read file: %w", err)
+func (s *S3Client) UploadFile(
+	ctx context.Context,
+	bucket string,
+	key string,
+	file io.Reader,
+	contentLength int64,
+	contentType string,
+) (string, error) {
+	input := &s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+		Body:   file,
 	}
 
-	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket:      aws.String(bucket),
-		Key:         aws.String(fileKey),
-		Body:        bytes.NewReader(buffer.Bytes()),
-		ContentType: aws.String(http.DetectContentType(buffer.Bytes())),
-	})
+	if contentLength >= 0 {
+		input.ContentLength = aws.Int64(contentLength)
+	}
+
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
+
+	_, err := s.client.PutObject(ctx, input)
 	if err != nil {
 		return "", fmt.Errorf("failed to upload file to S3: %w", err)
 	}
 
-	return fileKey, nil
+	return key, nil
 }
 
 func (s *S3Client) CreatePresignedUrl(ctx context.Context, bucket string, objectKey string) (string, error) {

@@ -19,7 +19,9 @@ func WithTransaction(ctx context.Context, db *TestDB, fn TxFn) error {
 	}
 
 	// Ensure rollback happens if commit doesn't occur
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Run the function within the transaction
 	if err := fn(tx); err != nil {
@@ -44,7 +46,9 @@ func WithRollbackTransaction(ctx context.Context, db *TestDB, fn TxFn) error {
 	}
 
 	// Always rollback at the end
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	// Run the function within the transaction
 	return fn(tx)

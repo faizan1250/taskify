@@ -50,18 +50,15 @@ func validateStruct(v Validatable) (string, []errs.FieldError) {
 func extractValidationErrors(err error) (string, []errs.FieldError) {
 	var fieldErrors []errs.FieldError
 	var validationErrors validator.ValidationErrors
-	ok := errors.As(err, &validationErrors)
-	if !ok {
-		customValidationErrors := func() CustomValidationErrors {
-			var target CustomValidationErrors
-			_ = errors.As(err, &target)
-			return target
-		}()
-		for _, err := range customValidationErrors {
-			fieldErrors = append(fieldErrors, errs.FieldError{
-				Field: err.Field,
-				Error: err.Message,
-			})
+	if !errors.As(err, &validationErrors) {
+		var customValidationErrors CustomValidationErrors
+		if errors.As(err, &customValidationErrors) {
+			for _, err := range customValidationErrors {
+				fieldErrors = append(fieldErrors, errs.FieldError{
+					Field: err.Field,
+					Error: err.Message,
+				})
+			}
 		}
 	}
 

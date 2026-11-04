@@ -37,7 +37,9 @@ func Migrate(ctx context.Context, logger *zerolog.Logger, cfg *config.Config) er
 	if err != nil {
 		return err
 	}
-	defer conn.Close(ctx)
+	defer func() {
+		_ = conn.Close(ctx)
+	}()
 
 	m, err := tern.NewMigrator(ctx, conn, "schema_version")
 	if err != nil {

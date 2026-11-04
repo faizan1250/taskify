@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/faizan1250/taskify/internal/middleware"
@@ -76,7 +77,10 @@ type FileResponseHandler struct {
 }
 
 func (h FileResponseHandler) Handle(c echo.Context, result interface{}) error {
-	data := result.([]byte)
+	data, ok := result.([]byte)
+	if !ok {
+		return echo.NewHTTPError(http.StatusInternalServerError, "invalid file response data")
+	}
 	c.Response().Header().Set("Content-Disposition", "attachment; filename="+h.filename)
 	return c.Blob(h.status, h.contentType, data)
 }

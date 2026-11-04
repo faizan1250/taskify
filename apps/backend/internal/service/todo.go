@@ -223,7 +223,9 @@ func (s *TodoService) UploadTodoAttachment(
 		logger.Error().Err(err).Msg("failed to open uploaded file")
 		return nil, errs.NewBadRequestError("failed to open uploaded file", false, nil, nil, nil)
 	}
-	defer src.Close()
+	defer func() {
+		_ = src.Close()
+	}()
 
 	// Upload to S3
 	s3Key, err := s.awsClient.S3.UploadFile(
@@ -243,7 +245,9 @@ func (s *TodoService) UploadTodoAttachment(
 		logger.Error().Err(err).Msg("failed to reopen file for MIME detection")
 		return nil, errs.NewBadRequestError("failed to process file", false, nil, nil, nil)
 	}
-	defer src.Close()
+	defer func() {
+		_ = src.Close()
+	}()
 
 	buffer := make([]byte, 512)
 	_, err = src.Read(buffer)

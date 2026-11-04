@@ -443,6 +443,80 @@ func TestTodoRepository_DeleteTodo(t *testing.T) {
 	})
 }
 
+func TestTodoRepository_DeleteTodo_CascadeSubtasks(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+
+	userID := uuid.New().String()
+	parentTodo := createTestTodo(t, ctx, todoRepo, userID)
+
+	child1, err := todoRepo.CreateTodo(ctx, userID, &todo.CreateTodoPayload{
+		Title:        "Child Todo 1",
+		ParentTodoID: &parentTodo.ID,
+	})
+	require.NoError(t, err)
+
+	child2, err := todoRepo.CreateTodo(ctx, userID, &todo.CreateTodoPayload{
+		Title:        "Child Todo 2",
+		ParentTodoID: &parentTodo.ID,
+	})
+	require.NoError(t, err)
+
+	// Delete parent todo
+	err = todoRepo.DeleteTodo(ctx, userID, parentTodo.ID)
+	require.NoError(t, err)
+
+	// Verify parent todo is deleted
+	result, err := todoRepo.GetTodoByID(ctx, userID, parentTodo.ID)
+	assert.Error(t, err)
+	assert.Nil(t, result)
+
+	// Verify subtasks were cascade deleted
+	child1Result, err := todoRepo.GetTodoByID(ctx, userID, child1.ID)
+	assert.Error(t, err)
+	assert.Nil(t, child1Result)
+
+	child2Result, err := todoRepo.GetTodoByID(ctx, userID, child2.ID)
+	assert.Error(t, err)
+	assert.Nil(t, child2Result)
+}
+
+func TestTodoRepository_DeleteTodo_ChildOnly(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+
+	userID := uuid.New().String()
+	parentTodo := createTestTodo(t, ctx, todoRepo, userID)
+
+	child, err := todoRepo.CreateTodo(ctx, userID, &todo.CreateTodoPayload{
+		Title:        "Child Todo to Delete",
+		ParentTodoID: &parentTodo.ID,
+	})
+	require.NoError(t, err)
+
+	// Delete child todo only
+	err = todoRepo.DeleteTodo(ctx, userID, child.ID)
+	require.NoError(t, err)
+
+	// Verify child todo is deleted
+	childResult, err := todoRepo.GetTodoByID(ctx, userID, child.ID)
+	assert.Error(t, err)
+	assert.Nil(t, childResult)
+
+	// Verify parent todo still exists and has no children
+	parentResult, err := todoRepo.GetTodoByID(ctx, userID, parentTodo.ID)
+	require.NoError(t, err)
+	require.NotNil(t, parentResult)
+	assert.Equal(t, parentTodo.ID, parentResult.ID)
+	assert.Empty(t, parentResult.Children)
+}
+
 func TestTodoRepository_GetTodoStats(t *testing.T) {
 	_, testServer, cleanup := testing_pkg.SetupTest(t)
 	defer cleanup()

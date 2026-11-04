@@ -4,6 +4,7 @@ import (
 	"github.com/faizan1250/taskify/internal/handler"
 	"github.com/faizan1250/taskify/internal/middleware"
 	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 )
 
 func registerTodoRoutes(r *echo.Group, h *handler.TodoHandler, ch *handler.CommentHandler, auth *middleware.AuthMiddleware) {
@@ -29,7 +30,7 @@ func registerTodoRoutes(r *echo.Group, h *handler.TodoHandler, ch *handler.Comme
 
 	// Todo attachments
 	todoAttachments := dynamicTodo.Group("/attachments")
-	todoAttachments.POST("", h.UploadTodoAttachment)
+	todoAttachments.POST("", h.UploadTodoAttachment, echoMiddleware.BodyLimit("10M"))
 	todoAttachments.DELETE("/:attachmentId", h.DeleteTodoAttachment)
 	todoAttachments.GET("/:attachmentId/download", h.GetAttachmentPresignedURL)
 }

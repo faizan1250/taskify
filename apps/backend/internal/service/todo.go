@@ -207,6 +207,23 @@ func (s *TodoService) GetTodoStats(ctx echo.Context, userID string) (*todo.TodoS
 	return stats, nil
 }
 
+// MaxAttachmentSize defines the maximum allowed size for uploaded attachments (10MB).
+const MaxAttachmentSize = 10 * 1024 * 1024
+
+// ValidateAttachment validates the attachment file header constraints.
+func ValidateAttachment(file *multipart.FileHeader) error {
+	if file == nil {
+		return errs.NewBadRequestError("file is required", false, nil, nil, nil)
+	}
+	if file.Size <= 0 {
+		return errs.NewBadRequestError("file cannot be empty", false, nil, nil, nil)
+	}
+	if file.Size > MaxAttachmentSize {
+		return errs.NewBadRequestError("file size exceeds maximum allowed limit of 10MB", false, nil, nil, nil)
+	}
+	return nil
+}
+
 // GenerateAttachmentKey builds a collision-resistant S3 key scoped to the todo and a unique UUID.
 func GenerateAttachmentKey(todoID uuid.UUID, filename string) string {
 	return fmt.Sprintf("todos/%s/attachments/%s/%s", todoID.String(), uuid.New().String(), filepath.Base(filename))
@@ -219,6 +236,12 @@ func (s *TodoService) UploadTodoAttachment(
 	file *multipart.FileHeader,
 ) (*todo.TodoAttachment, error) {
 	logger := middleware.GetLogger(ctx)
+
+	// Validate attachment size and presence
+	if err := ValidateAttachment(file); err != nil {
+		logger.Error().Err(err).Msg("attachment validation failed")
+		return nil, err
+	}
 
 	// Verify todo exists and belongs to user
 	_, err := s.todoRepo.CheckTodoExists(ctx.Request().Context(), userID, todoID)

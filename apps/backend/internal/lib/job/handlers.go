@@ -3,10 +3,14 @@ package job
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/faizan1250/taskify/internal/config"
+	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/lib/email"
+	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/hibiken/asynq"
 	"github.com/rs/zerolog"
 )
@@ -58,6 +62,35 @@ func (j *JobService) handleReminderEmailTask(ctx context.Context, t *asynq.Task)
 		Str("todo_id", p.TodoID.String()).
 		Str("todo_title", p.TodoTitle).
 		Msg("Processing reminder email task")
+
+	if j.todoRepo != nil {
+		status, err := j.todoRepo.GetTodoStatus(ctx, p.TodoID)
+		if err != nil {
+			var httpErr *errs.HTTPError
+			if errors.As(err, &httpErr) && httpErr.Status == http.StatusNotFound {
+				j.logger.Info().
+					Str("type", p.TaskType).
+					Str("todo_id", p.TodoID.String()).
+					Msg("Todo no longer exists, skipping reminder email")
+				return nil
+			}
+			j.logger.Error().
+				Str("type", p.TaskType).
+				Str("todo_id", p.TodoID.String()).
+				Err(err).
+				Msg("Failed to check todo status")
+			return fmt.Errorf("failed to check todo status for todo %s: %w", p.TodoID, err)
+		}
+
+		if status == string(todo.StatusCompleted) || status == string(todo.StatusArchived) {
+			j.logger.Info().
+				Str("type", p.TaskType).
+				Str("todo_id", p.TodoID.String()).
+				Str("status", status).
+				Msg("Todo is no longer active, skipping reminder email")
+			return nil
+		}
+	}
 
 	userEmail, err := j.authService.GetUserEmail(ctx, p.UserID)
 	if err != nil {

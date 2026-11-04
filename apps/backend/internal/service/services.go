@@ -21,6 +21,7 @@ func NewServices(s *server.Server, repos *repository.Repositories) (*Services, e
 	authService := NewAuthService(s)
 
 	s.Job.SetAuthService(authService)
+	s.Job.SetTodoRepository(repos.Todo)
 
 	awsClient, err := aws.NewAWS(s)
 	if err != nil {

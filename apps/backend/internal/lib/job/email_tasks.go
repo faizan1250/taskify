@@ -2,6 +2,7 @@ package job
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/faizan1250/taskify/internal/model/todo"
@@ -43,13 +44,28 @@ type ReminderEmailTask struct {
 	TaskType  string    `json:"task_type"` // "due_date_reminder" or "overdue_notification"
 }
 
+func GenerateReminderTaskID(task *ReminderEmailTask) string {
+	switch task.TaskType {
+	case "due_date_reminder":
+		return fmt.Sprintf("due_date_reminder:%s:%s", task.TodoID, task.DueDate.UTC().Format("2006-01-02"))
+	case "overdue_notification":
+		return fmt.Sprintf("overdue_notification:%s:%s", task.TodoID, time.Now().UTC().Format("2006-01-02"))
+	default:
+		return fmt.Sprintf("%s:%s:%s", task.TaskType, task.TodoID, time.Now().UTC().Format("2006-01-02"))
+	}
+}
+
 func EnqueueReminderEmail(client *asynq.Client, task *ReminderEmailTask) error {
 	payload, err := json.Marshal(task)
 	if err != nil {
 		return err
 	}
 
+	taskID := GenerateReminderTaskID(task)
+
 	asynqTask := asynq.NewTask(TaskReminderEmail, payload,
+		asynq.TaskID(taskID),
+		asynq.Retention(24*time.Hour),
 		asynq.MaxRetry(3),
 		asynq.Queue("default"),
 		asynq.Timeout(30*time.Second))

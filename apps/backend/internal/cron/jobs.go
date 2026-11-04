@@ -2,11 +2,13 @@ package cron
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/faizan1250/taskify/internal/lib/job"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 )
 
 type DueDateRemindersJob struct{}
@@ -52,12 +54,26 @@ func (j *DueDateRemindersJob) Run(ctx context.Context, jobCtx *JobContext) error
 
 		err := job.EnqueueReminderEmail(jobCtx.JobClient, reminderTask)
 		if err != nil {
+			if errors.Is(err, asynq.ErrTaskIDConflict) {
+				jobCtx.Server.Logger.Info().
+					Str("todo_id", todo.ID.String()).
+					Str("user_id", todo.UserID).
+					Msg("Reminder email already enqueued for todo, skipping duplicate")
+				continue
+			}
 			jobCtx.Server.Logger.Error().
 				Err(err).
 				Str("todo_id", todo.ID.String()).
 				Str("user_id", todo.UserID).
 				Msg("Failed to enqueue reminder email")
 			continue
+		}
+
+		if err := jobCtx.Repositories.Todo.MarkDueDateReminderSent(ctx, todo.ID); err != nil {
+			jobCtx.Server.Logger.Error().
+				Err(err).
+				Str("todo_id", todo.ID.String()).
+				Msg("Failed to mark due date reminder sent")
 		}
 
 		enqueuedCount++
@@ -122,12 +138,26 @@ func (j *OverdueNotificationsJob) Run(ctx context.Context, jobCtx *JobContext) e
 
 		err := job.EnqueueReminderEmail(jobCtx.JobClient, overdueTask)
 		if err != nil {
+			if errors.Is(err, asynq.ErrTaskIDConflict) {
+				jobCtx.Server.Logger.Info().
+					Str("todo_id", todo.ID.String()).
+					Str("user_id", todo.UserID).
+					Msg("Overdue notification already enqueued for todo, skipping duplicate")
+				continue
+			}
 			jobCtx.Server.Logger.Error().
 				Err(err).
 				Str("todo_id", todo.ID.String()).
 				Str("user_id", todo.UserID).
 				Msg("Failed to enqueue overdue notification")
 			continue
+		}
+
+		if err := jobCtx.Repositories.Todo.MarkOverdueNotificationSent(ctx, todo.ID); err != nil {
+			jobCtx.Server.Logger.Error().
+				Err(err).
+				Str("todo_id", todo.ID.String()).
+				Msg("Failed to mark overdue notification sent")
 		}
 
 		enqueuedCount++

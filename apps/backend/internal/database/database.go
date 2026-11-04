@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"net/url"
 	"strconv"
@@ -73,10 +74,10 @@ func NewPoolConfig(cfg *config.Config, logger *zerolog.Logger, loggerService *lo
 		return nil, fmt.Errorf("failed to parse pgx pool config: %w", err)
 	}
 
-	if cfg.Database.MaxOpenConns > 0 {
+	if cfg.Database.MaxOpenConns > 0 && cfg.Database.MaxOpenConns <= math.MaxInt32 {
 		pgxPoolConfig.MaxConns = int32(cfg.Database.MaxOpenConns)
 	}
-	if cfg.Database.MaxIdleConns > 0 {
+	if cfg.Database.MaxIdleConns > 0 && cfg.Database.MaxIdleConns <= math.MaxInt32 {
 		pgxPoolConfig.MinConns = int32(cfg.Database.MaxIdleConns)
 	}
 	if cfg.Database.ConnMaxLifetime > 0 {

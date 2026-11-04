@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hibiken/asynq"
-	"github.com/redis/go-redis/v9"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/logger"
 	"github.com/faizan1250/taskify/internal/repository"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 )
 
 type JobContext struct {
@@ -70,10 +70,10 @@ func (c *JobContext) Close() {
 		c.Server.DB.Pool.Close()
 	}
 	if c.Server != nil && c.Server.Redis != nil {
-		c.Server.Redis.Close()
+		_ = c.Server.Redis.Close()
 	}
 	if c.JobClient != nil {
-		c.JobClient.Close()
+		_ = c.JobClient.Close()
 	}
 	if c.LoggerService != nil {
 		c.LoggerService.Shutdown()

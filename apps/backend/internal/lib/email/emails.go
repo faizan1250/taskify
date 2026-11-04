@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/faizan1250/taskify/internal/model/todo"
+	"github.com/google/uuid"
 )
 
 func (c *Client) SendWelcomeEmail(to, firstName string) error {
@@ -26,7 +26,7 @@ func (c *Client) SendDueDateReminderEmail(to, todoTitle string, todoID uuid.UUID
 		"TodoTitle":    todoTitle,
 		"TodoID":       todoID.String(),
 		"DueDate":      dueDate.Format("Monday, January 2, 2006 at 3:04 PM"),
-		"DaysUntilDue": int(dueDate.Sub(time.Now()).Hours() / 24),
+		"DaysUntilDue": int(time.Until(dueDate).Hours() / 24),
 	}
 
 	return c.SendEmail(
@@ -42,7 +42,7 @@ func (c *Client) SendOverdueNotificationEmail(to, todoTitle string, todoID uuid.
 		"TodoTitle":   todoTitle,
 		"TodoID":      todoID.String(),
 		"DueDate":     dueDate.Format("Monday, January 2, 2006 at 3:04 PM"),
-		"DaysOverdue": int(time.Now().Sub(dueDate).Hours() / 24),
+		"DaysOverdue": int(time.Since(dueDate).Hours() / 24),
 	}
 
 	return c.SendEmail(

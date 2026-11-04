@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type TodoRepository struct {

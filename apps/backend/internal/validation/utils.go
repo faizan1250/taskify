@@ -1,14 +1,15 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
 	"strings"
 
+	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
-	"github.com/faizan1250/taskify/internal/errs"
 )
 
 type Validatable interface {
@@ -48,14 +49,16 @@ func validateStruct(v Validatable) (string, []errs.FieldError) {
 
 func extractValidationErrors(err error) (string, []errs.FieldError) {
 	var fieldErrors []errs.FieldError
-	validationErrors, ok := err.(validator.ValidationErrors)
-	if !ok {
-		customValidationErrors := err.(CustomValidationErrors)
-		for _, err := range customValidationErrors {
-			fieldErrors = append(fieldErrors, errs.FieldError{
-				Field: err.Field,
-				Error: err.Message,
-			})
+	var validationErrors validator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
+		var customValidationErrors CustomValidationErrors
+		if errors.As(err, &customValidationErrors) {
+			for _, err := range customValidationErrors {
+				fieldErrors = append(fieldErrors, errs.FieldError{
+					Field: err.Field,
+					Error: err.Message,
+				})
+			}
 		}
 	}
 

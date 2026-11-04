@@ -185,7 +185,9 @@ func LoadConfig() (*Config, error) {
 	}
 
 	for key, value := range envVars {
-		k.Set(key, value)
+		if err := k.Set(key, value); err != nil {
+			logger.Fatal().Err(err).Str("key", key).Msg("could not set config key")
+		}
 	}
 
 	mainConfig := &Config{}

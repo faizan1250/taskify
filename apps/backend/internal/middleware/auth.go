@@ -7,9 +7,9 @@ import (
 
 	"github.com/clerk/clerk-sdk-go/v2"
 	clerkhttp "github.com/clerk/clerk-sdk-go/v2/http"
-	"github.com/labstack/echo/v4"
 	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/labstack/echo/v4"
 )
 
 type AuthMiddleware struct {
@@ -60,7 +60,7 @@ func (auth *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc 
 
 		c.Set("user_id", claims.Subject)
 		c.Set("user_role", claims.ActiveOrganizationRole)
-		c.Set("permissions", claims.Claims.ActiveOrganizationPermissions)
+		c.Set("permissions", claims.ActiveOrganizationPermissions)
 
 		auth.server.Logger.Info().
 			Str("function", "RequireAuth").

@@ -3,11 +3,11 @@ package job
 import (
 	"context"
 
-	"github.com/hibiken/asynq"
-	"github.com/rs/zerolog"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/lib/email"
+	"github.com/hibiken/asynq"
+	"github.com/rs/zerolog"
 )
 
 type JobService struct {
@@ -72,5 +72,5 @@ func (j *JobService) Start() error {
 func (j *JobService) Stop() {
 	j.logger.Info().Msg("Stopping background job server")
 	j.server.Shutdown()
-	j.Client.Close()
+	_ = j.Client.Close()
 }

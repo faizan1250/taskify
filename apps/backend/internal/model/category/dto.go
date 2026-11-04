@@ -69,7 +69,6 @@ func (q *GetCategoriesQuery) Validate() error {
 	return nil
 }
 
-
 type DeleteCategoryPayload struct {
 	ID uuid.UUID `param:"id" validate:"required,uuid"`
 }

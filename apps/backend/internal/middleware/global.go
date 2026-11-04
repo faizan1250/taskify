@@ -3,13 +3,13 @@ package middleware
 import (
 	"net/http"
 
+	"github.com/faizan1250/taskify/internal/errs"
+	"github.com/faizan1250/taskify/internal/server"
+	"github.com/faizan1250/taskify/internal/sqlerr"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
-	"github.com/faizan1250/taskify/internal/errs"
-	"github.com/faizan1250/taskify/internal/server"
-	"github.com/faizan1250/taskify/internal/sqlerr"
 )
 
 type GlobalMiddlewares struct {

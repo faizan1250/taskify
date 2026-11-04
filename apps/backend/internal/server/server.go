@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/newrelic/go-agent/v3/integrations/nrredis-v9"
-	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
 	"github.com/faizan1250/taskify/internal/config"
 	"github.com/faizan1250/taskify/internal/database"
 	"github.com/faizan1250/taskify/internal/lib/job"
 	loggerPkg "github.com/faizan1250/taskify/internal/logger"
+	"github.com/newrelic/go-agent/v3/integrations/nrredis-v9"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 )
 
 type Server struct {

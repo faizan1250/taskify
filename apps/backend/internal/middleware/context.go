@@ -3,17 +3,20 @@ package middleware
 import (
 	"context"
 
+	"github.com/faizan1250/taskify/internal/logger"
+	"github.com/faizan1250/taskify/internal/server"
 	"github.com/labstack/echo/v4"
 	"github.com/newrelic/go-agent/v3/newrelic"
 	"github.com/rs/zerolog"
-	"github.com/faizan1250/taskify/internal/logger"
-	"github.com/faizan1250/taskify/internal/server"
 )
 
+type contextKey string
+
 const (
-	UserIDKey   = "user_id"
-	UserRoleKey = "user_role"
-	LoggerKey   = "logger"
+	UserIDKey              = "user_id"
+	UserRoleKey            = "user_role"
+	LoggerKey              = "logger"
+	loggerKey   contextKey = "logger"
 )
 
 type ContextEnhancer struct {
@@ -56,7 +59,7 @@ func (ce *ContextEnhancer) EnhanceContext() echo.MiddlewareFunc {
 			c.Set(LoggerKey, &contextLogger)
 
 			// Create a new context with the logger
-			ctx := context.WithValue(c.Request().Context(), LoggerKey, &contextLogger)
+			ctx := context.WithValue(c.Request().Context(), loggerKey, &contextLogger)
 			c.SetRequest(c.Request().WithContext(ctx))
 
 			return next(c)

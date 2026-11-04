@@ -63,6 +63,8 @@ func generateErrorCode(tableName string, errType Code) string {
 		action = "REQUIRED"
 	case CheckViolation:
 		action = "INVALID"
+	default:
+		// Default to generic ERROR action
 	}
 
 	return fmt.Sprintf("%s_%s", domain, action)

@@ -28,14 +28,13 @@ func (h *HealthHandler) CheckHealth(c echo.Context) error {
 		Str("operation", "health_check").
 		Logger()
 
+	checks := make(map[string]interface{})
 	response := map[string]interface{}{
 		"status":      "healthy",
 		"timestamp":   time.Now().UTC(),
 		"environment": h.server.Config.Primary.Env,
-		"checks":      make(map[string]interface{}),
+		"checks":      checks,
 	}
-
-	checks := response["checks"].(map[string]interface{})
 	isHealthy := true
 
 	// Check database connectivity

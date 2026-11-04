@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
 	"github.com/faizan1250/taskify/internal/cron"
+	"github.com/spf13/cobra"
 )
 
 func main() {

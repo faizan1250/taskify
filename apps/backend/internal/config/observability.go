@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -59,7 +60,7 @@ func DefaultObservabilityConfig() *ObservabilityConfig {
 
 func (c *ObservabilityConfig) Validate() error {
 	if c.ServiceName == "" {
-		return fmt.Errorf("service_name is required")
+		return errors.New("service_name is required")
 	}
 
 	// Validate log level
@@ -72,7 +73,7 @@ func (c *ObservabilityConfig) Validate() error {
 
 	// Validate slow query threshold
 	if c.Logging.SlowQueryThreshold < 0 {
-		return fmt.Errorf("logging slow_query_threshold must be non-negative")
+		return errors.New("logging slow_query_threshold must be non-negative")
 	}
 
 	return nil

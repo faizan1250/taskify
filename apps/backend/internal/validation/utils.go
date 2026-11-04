@@ -28,8 +28,25 @@ func (c CustomValidationErrors) Error() string {
 }
 
 func BindAndValidate(c echo.Context, payload Validatable) error {
+	if payload == nil {
+		return errs.NewBadRequestError("payload cannot be nil", false, nil, nil, nil)
+	}
+
 	if err := c.Bind(payload); err != nil {
-		message := strings.Split(strings.Split(err.Error(), ",")[1], "message=")[1]
+		message := "Invalid request payload"
+		var echoErr *echo.HTTPError
+		if errors.As(err, &echoErr) {
+			if msg, ok := echoErr.Message.(string); ok {
+				message = msg
+			} else {
+				message = fmt.Sprintf("%v", echoErr.Message)
+			}
+			if echoErr.Internal != nil {
+				message = fmt.Sprintf("%s: %v", message, echoErr.Internal)
+			}
+		} else if err.Error() != "" {
+			message = err.Error()
+		}
 		return errs.NewBadRequestError(message, false, nil, nil, nil)
 	}
 
@@ -41,6 +58,12 @@ func BindAndValidate(c echo.Context, payload Validatable) error {
 }
 
 func validateStruct(v Validatable) (string, []errs.FieldError) {
+	if v == nil {
+		return "Validation failed", []errs.FieldError{{
+			Field: "payload",
+			Error: "payload cannot be nil",
+		}}
+	}
 	if err := v.Validate(); err != nil {
 		return extractValidationErrors(err)
 	}

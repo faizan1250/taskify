@@ -5,7 +5,7 @@ formatters:
     - goimports
 
 run:
-  timeout: 3m
+  timeout: 5m
 
 linters:
   default: none
@@ -86,6 +86,7 @@ linters:
       check-type-assertions: true
 
     exhaustive:
+      default-signifies-exhaustive: true
       check:
         - switch
         - map

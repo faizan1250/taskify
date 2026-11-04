@@ -723,3 +723,86 @@ func TestTodoRepository_CartesianProductNoDuplication(t *testing.T) {
 		assert.Len(t, overdueTodos[0].Attachments, 2)
 	})
 }
+
+func TestTodoRepository_GetAttachmentKeysForTodoAndSubtasks(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+
+	userID := uuid.New().String()
+	otherUserID := uuid.New().String()
+
+	// 1. Create parent todo with 2 attachments
+	parentTodo := createTestTodo(t, ctx, todoRepo, userID)
+	_, err := todoRepo.UploadTodoAttachment(ctx, parentTodo.ID, userID, "keys/parent-1.pdf", "parent-1.pdf", 100, "application/pdf")
+	require.NoError(t, err)
+	_, err = todoRepo.UploadTodoAttachment(ctx, parentTodo.ID, userID, "keys/parent-2.png", "parent-2.png", 200, "image/png")
+	require.NoError(t, err)
+
+	// 2. Create child subtasks with attachments
+	child1, err := todoRepo.CreateTodo(ctx, userID, &todo.CreateTodoPayload{
+		Title:        "Child Todo 1",
+		ParentTodoID: &parentTodo.ID,
+	})
+	require.NoError(t, err)
+	_, err = todoRepo.UploadTodoAttachment(ctx, child1.ID, userID, "keys/child1-1.txt", "child1-1.txt", 50, "text/plain")
+	require.NoError(t, err)
+
+	child2, err := todoRepo.CreateTodo(ctx, userID, &todo.CreateTodoPayload{
+		Title:        "Child Todo 2",
+		ParentTodoID: &parentTodo.ID,
+	})
+	require.NoError(t, err)
+	_, err = todoRepo.UploadTodoAttachment(ctx, child2.ID, userID, "keys/child2-1.doc", "child2-1.doc", 300, "application/msword")
+	require.NoError(t, err)
+
+	// 3. Create another user's todo with attachment to verify tenant isolation
+	otherTodo := createTestTodo(t, ctx, todoRepo, otherUserID)
+	_, err = todoRepo.UploadTodoAttachment(ctx, otherTodo.ID, otherUserID, "keys/other-user.pdf", "other.pdf", 150, "application/pdf")
+	require.NoError(t, err)
+
+	t.Run("retrieves attachment keys across parent and subtasks", func(t *testing.T) {
+		keys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, userID, parentTodo.ID)
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{
+			"keys/parent-1.pdf",
+			"keys/parent-2.png",
+			"keys/child1-1.txt",
+			"keys/child2-1.doc",
+		}, keys)
+	})
+
+	t.Run("tenant isolation prevents cross-tenant key leakage", func(t *testing.T) {
+		// Other user querying parentTodo returns nothing
+		keys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, otherUserID, parentTodo.ID)
+		require.NoError(t, err)
+		assert.Empty(t, keys)
+
+		// Primary user querying otherTodo returns nothing
+		otherKeys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, userID, otherTodo.ID)
+		require.NoError(t, err)
+		assert.Empty(t, otherKeys)
+	})
+
+	t.Run("returns empty slice when todo has no attachments", func(t *testing.T) {
+		emptyTodo := createTestTodo(t, ctx, todoRepo, userID)
+		keys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, userID, emptyTodo.ID)
+		require.NoError(t, err)
+		assert.Empty(t, keys)
+	})
+
+	t.Run("returns empty slice for non-existent todo", func(t *testing.T) {
+		nonExistentID := uuid.New()
+		keys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, userID, nonExistentID)
+		require.NoError(t, err)
+		assert.Empty(t, keys)
+	})
+
+	t.Run("querying child subtask directly returns only child attachments", func(t *testing.T) {
+		keys, err := todoRepo.GetAttachmentKeysForTodoAndSubtasks(ctx, userID, child1.ID)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"keys/child1-1.txt"}, keys)
+	})
+}

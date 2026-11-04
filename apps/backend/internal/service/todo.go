@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/faizan1250/taskify/internal/errs"
@@ -204,6 +207,11 @@ func (s *TodoService) GetTodoStats(ctx echo.Context, userID string) (*todo.TodoS
 	return stats, nil
 }
 
+// GenerateAttachmentKey builds a collision-resistant S3 key scoped to the todo and a unique UUID.
+func GenerateAttachmentKey(todoID uuid.UUID, filename string) string {
+	return fmt.Sprintf("todos/%s/attachments/%s/%s", todoID.String(), uuid.New().String(), filepath.Base(filename))
+}
+
 func (s *TodoService) UploadTodoAttachment(
 	ctx echo.Context,
 	userID string,
@@ -229,35 +237,36 @@ func (s *TodoService) UploadTodoAttachment(
 		_ = src.Close()
 	}()
 
+	// Detect MIME type
+	buffer := make([]byte, 512)
+	n, err := src.Read(buffer)
+	if err != nil && !errors.Is(err, io.EOF) {
+		logger.Error().Err(err).Msg("failed to read file for MIME detection")
+		return nil, errs.NewBadRequestError("failed to process file", false, nil, nil, nil)
+	}
+	mimeType := http.DetectContentType(buffer[:n])
+
+	// Rewind file stream before upload
+	if _, err := src.Seek(0, io.SeekStart); err != nil {
+		logger.Error().Err(err).Msg("failed to rewind file stream")
+		return nil, errs.NewBadRequestError("failed to process file", false, nil, nil, nil)
+	}
+
+	s3Key := GenerateAttachmentKey(todoID, file.Filename)
+
 	// Upload to S3
-	s3Key, err := s.awsClient.S3.UploadFile(
+	s3Key, err = s.awsClient.S3.UploadFile(
 		ctx.Request().Context(),
 		s.server.Config.AWS.UploadBucket,
-		"todos/attachments/"+file.Filename,
+		s3Key,
 		src,
+		file.Size,
+		mimeType,
 	)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to upload file to S3")
 		return nil, errors.Wrap(err, "failed to upload file")
 	}
-
-	// Detect MIME type
-	src, err = file.Open()
-	if err != nil {
-		logger.Error().Err(err).Msg("failed to reopen file for MIME detection")
-		return nil, errs.NewBadRequestError("failed to process file", false, nil, nil, nil)
-	}
-	defer func() {
-		_ = src.Close()
-	}()
-
-	buffer := make([]byte, 512)
-	_, err = src.Read(buffer)
-	if err != nil {
-		logger.Error().Err(err).Msg("failed to read file for MIME detection")
-		return nil, errs.NewBadRequestError("failed to process file", false, nil, nil, nil)
-	}
-	mimeType := http.DetectContentType(buffer)
 
 	// Create attachment record
 	attachment, err := s.todoRepo.UploadTodoAttachment(

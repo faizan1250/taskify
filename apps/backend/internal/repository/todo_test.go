@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/faizan1250/taskify/internal/model/comment"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/repository"
 	testing_pkg "github.com/faizan1250/taskify/internal/testing"
@@ -516,4 +517,135 @@ func createTestTodos(t *testing.T, ctx context.Context, repo *repository.TodoRep
 	}
 
 	return todos
+}
+
+func TestTodoRepository_CartesianProductNoDuplication(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+	commentRepo := repository.NewCommentRepository(testServer)
+
+	userID := uuid.New().String()
+
+	// Create a parent todo
+	parentTodo := createTestTodo(t, ctx, todoRepo, userID)
+
+	// Create 2 children
+	child1Payload := &todo.CreateTodoPayload{
+		Title:        "Child Todo 1",
+		ParentTodoID: &parentTodo.ID,
+	}
+	child1, err := todoRepo.CreateTodo(ctx, userID, child1Payload)
+	require.NoError(t, err)
+
+	child2Payload := &todo.CreateTodoPayload{
+		Title:        "Child Todo 2",
+		ParentTodoID: &parentTodo.ID,
+	}
+	child2, err := todoRepo.CreateTodo(ctx, userID, child2Payload)
+	require.NoError(t, err)
+
+	// Create 2 comments
+	comment1, err := commentRepo.AddComment(ctx, userID, parentTodo.ID, &comment.AddCommentPayload{
+		Content: "Comment 1",
+	})
+	require.NoError(t, err)
+
+	comment2, err := commentRepo.AddComment(ctx, userID, parentTodo.ID, &comment.AddCommentPayload{
+		Content: "Comment 2",
+	})
+	require.NoError(t, err)
+
+	// Create 2 attachments
+	att1, err := todoRepo.UploadTodoAttachment(ctx, parentTodo.ID, userID, "key-1", "file1.txt", 100, "text/plain")
+	require.NoError(t, err)
+
+	att2, err := todoRepo.UploadTodoAttachment(ctx, parentTodo.ID, userID, "key-2", "file2.txt", 200, "text/plain")
+	require.NoError(t, err)
+
+	t.Run("GetTodoByID does not duplicate children, comments, or attachments", func(t *testing.T) {
+		res, err := todoRepo.GetTodoByID(ctx, userID, parentTodo.ID)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		// Without fix, cartesian product of 2 children x 2 comments x 2 attachments would result in 8 entries each.
+		assert.Len(t, res.Children, 2)
+		assert.Len(t, res.Comments, 2)
+		assert.Len(t, res.Attachments, 2)
+
+		childIDs := map[uuid.UUID]bool{res.Children[0].ID: true, res.Children[1].ID: true}
+		assert.True(t, childIDs[child1.ID])
+		assert.True(t, childIDs[child2.ID])
+
+		commentIDs := map[uuid.UUID]bool{res.Comments[0].ID: true, res.Comments[1].ID: true}
+		assert.True(t, commentIDs[comment1.ID])
+		assert.True(t, commentIDs[comment2.ID])
+
+		attIDs := map[uuid.UUID]bool{res.Attachments[0].ID: true, res.Attachments[1].ID: true}
+		assert.True(t, attIDs[att1.ID])
+		assert.True(t, attIDs[att2.ID])
+	})
+
+	t.Run("GetTodos does not duplicate children, comments, or attachments", func(t *testing.T) {
+		page := 1
+		limit := 10
+		res, err := todoRepo.GetTodos(ctx, userID, &todo.GetTodosQuery{
+			Page:  &page,
+			Limit: &limit,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		var found *todo.PopulatedTodo
+		for i := range res.Data {
+			if res.Data[i].ID == parentTodo.ID {
+				found = &res.Data[i]
+				break
+			}
+		}
+		require.NotNil(t, found, "parent todo should be found in GetTodos")
+		assert.Len(t, found.Children, 2)
+		assert.Len(t, found.Comments, 2)
+		assert.Len(t, found.Attachments, 2)
+	})
+
+	t.Run("GetCompletedTodosForUser does not duplicate children, comments, or attachments", func(t *testing.T) {
+		status := todo.StatusCompleted
+		_, err := todoRepo.UpdateTodo(ctx, userID, &todo.UpdateTodoPayload{
+			ID:     parentTodo.ID,
+			Status: &status,
+		})
+		require.NoError(t, err)
+
+		startDate := time.Now().Add(-1 * time.Hour)
+		endDate := time.Now().Add(1 * time.Hour)
+		completedTodos, err := todoRepo.GetCompletedTodosForUser(ctx, userID, startDate, endDate)
+		require.NoError(t, err)
+		require.Len(t, completedTodos, 1)
+
+		assert.Len(t, completedTodos[0].Children, 2)
+		assert.Len(t, completedTodos[0].Comments, 2)
+		assert.Len(t, completedTodos[0].Attachments, 2)
+	})
+
+	t.Run("GetOverdueTodosForUser does not duplicate children, comments, or attachments", func(t *testing.T) {
+		status := todo.StatusActive
+		pastDue := time.Now().Add(-2 * time.Hour)
+		_, err := todoRepo.UpdateTodo(ctx, userID, &todo.UpdateTodoPayload{
+			ID:      parentTodo.ID,
+			Status:  &status,
+			DueDate: &pastDue,
+		})
+		require.NoError(t, err)
+
+		overdueTodos, err := todoRepo.GetOverdueTodosForUser(ctx, userID)
+		require.NoError(t, err)
+		require.Len(t, overdueTodos, 1)
+
+		assert.Len(t, overdueTodos[0].Children, 2)
+		assert.Len(t, overdueTodos[0].Comments, 2)
+		assert.Len(t, overdueTodos[0].Attachments, 2)
+	})
 }

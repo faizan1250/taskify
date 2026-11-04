@@ -801,51 +801,46 @@ func (r *TodoRepository) GetCompletedTodosForUser(ctx context.Context, userID st
 				ELSE NULL
 			END AS category,
 			COALESCE(
-				jsonb_agg(
-					CASE
-						WHEN child.id IS NOT NULL THEN to_jsonb(camel(child))
-						ELSE NULL
-					END
-				) FILTER (
-					WHERE child.id IS NOT NULL
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(child))
+						ORDER BY child.sort_order ASC, child.created_at ASC
+					)
+					FROM todos child
+					WHERE child.parent_todo_id = t.id AND child.user_id = @user_id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS children,
 			COALESCE(
-				jsonb_agg(
-					CASE
-						WHEN com.id IS NOT NULL THEN to_jsonb(camel(com))
-						ELSE NULL
-					END
-				) FILTER (
-					WHERE com.id IS NOT NULL
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(com))
+						ORDER BY com.created_at ASC
+					)
+					FROM todo_comments com
+					WHERE com.todo_id = t.id AND com.user_id = @user_id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS comments,
-			 		 COALESCE(
-				jsonb_agg(
-					to_jsonb(camel (att))
-					ORDER BY
-						att.created_at DESC
-				) FILTER (
-					WHERE
-						att.id IS NOT NULL
+			COALESCE(
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(att))
+						ORDER BY att.created_at DESC
+					)
+					FROM todo_attachments att
+					WHERE att.todo_id = t.id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS attachments
 		FROM
 			todos t
 			LEFT JOIN todo_categories c ON c.id = t.category_id AND c.user_id = @user_id
-			LEFT JOIN todos child ON child.parent_todo_id = t.id AND child.user_id = @user_id
-			LEFT JOIN todo_comments com ON com.todo_id = t.id AND com.user_id = @user_id
-			LEFT JOIN todo_attachments att ON att.todo_id=t.id
 		WHERE
 			t.user_id = @user_id
 			AND t.status = 'completed'
 			AND t.completed_at >= @start_date
 			AND t.completed_at <= @end_date
-		GROUP BY
-			t.id, c.id
 		ORDER BY
 			t.completed_at DESC
 		LIMIT 10
@@ -880,50 +875,45 @@ func (r *TodoRepository) GetOverdueTodosForUser(ctx context.Context, userID stri
 				ELSE NULL
 			END AS category,
 			COALESCE(
-				jsonb_agg(
-					CASE
-						WHEN child.id IS NOT NULL THEN to_jsonb(camel(child))
-						ELSE NULL
-					END
-				) FILTER (
-					WHERE child.id IS NOT NULL
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(child))
+						ORDER BY child.sort_order ASC, child.created_at ASC
+					)
+					FROM todos child
+					WHERE child.parent_todo_id = t.id AND child.user_id = @user_id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS children,
 			COALESCE(
-				jsonb_agg(
-					CASE
-						WHEN com.id IS NOT NULL THEN to_jsonb(camel(com))
-						ELSE NULL
-					END
-				) FILTER (
-					WHERE com.id IS NOT NULL
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(com))
+						ORDER BY com.created_at ASC
+					)
+					FROM todo_comments com
+					WHERE com.todo_id = t.id AND com.user_id = @user_id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS comments,
-					 COALESCE(
-				jsonb_agg(
-					to_jsonb(camel (att))
-					ORDER BY
-						att.created_at DESC
-				) FILTER (
-					WHERE
-						att.id IS NOT NULL
+			COALESCE(
+				(
+					SELECT jsonb_agg(
+						to_jsonb(camel(att))
+						ORDER BY att.created_at DESC
+					)
+					FROM todo_attachments att
+					WHERE att.todo_id = t.id
 				),
-				'[]'::JSONB
+				'[]'::jsonb
 			) AS attachments
 		FROM
 			todos t
 			LEFT JOIN todo_categories c ON c.id = t.category_id AND c.user_id = @user_id
-			LEFT JOIN todos child ON child.parent_todo_id = t.id AND child.user_id = @user_id
-			LEFT JOIN todo_comments com ON com.todo_id = t.id AND com.user_id = @user_id
-			LEFT JOIN todo_attachments att ON att.todo_id=t.id
 		WHERE
 			t.user_id = @user_id
 			AND t.due_date < NOW()
 			AND t.status NOT IN ('completed', 'archived')
-		GROUP BY
-			t.id, c.id
 		ORDER BY
 			t.due_date ASC
 		LIMIT 10

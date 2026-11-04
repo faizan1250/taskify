@@ -33,28 +33,32 @@ func BindAndValidate(c echo.Context, payload Validatable) error {
 	}
 
 	if err := c.Bind(payload); err != nil {
-		message := "Invalid request payload"
-		var echoErr *echo.HTTPError
-		if errors.As(err, &echoErr) {
-			if msg, ok := echoErr.Message.(string); ok {
-				message = msg
-			} else {
-				message = fmt.Sprintf("%v", echoErr.Message)
-			}
-			if echoErr.Internal != nil {
-				message = fmt.Sprintf("%s: %v", message, echoErr.Internal)
-			}
-		} else if err.Error() != "" {
-			message = err.Error()
-		}
+		message := extractBindErrorMessage(err)
 		return errs.NewBadRequestError(message, false, nil, nil, nil)
 	}
 
-	if msg, fieldErrors := validateStruct(payload); fieldErrors != nil {
+	if msg, fieldErrors := validateStruct(payload); len(fieldErrors) > 0 {
 		return errs.NewBadRequestError(msg, true, nil, fieldErrors, nil)
 	}
 
 	return nil
+}
+
+func extractBindErrorMessage(err error) string {
+	var echoErr *echo.HTTPError
+	if errors.As(err, &echoErr) {
+		message := fmt.Sprintf("%v", echoErr.Message)
+		if echoErr.Internal != nil {
+			return fmt.Sprintf("%s: %v", message, echoErr.Internal)
+		}
+		return message
+	}
+
+	if err.Error() != "" {
+		return err.Error()
+	}
+
+	return "Invalid request payload"
 }
 
 func validateStruct(v Validatable) (string, []errs.FieldError) {
@@ -71,66 +75,72 @@ func validateStruct(v Validatable) (string, []errs.FieldError) {
 }
 
 func extractValidationErrors(err error) (string, []errs.FieldError) {
-	var fieldErrors []errs.FieldError
 	var validationErrors validator.ValidationErrors
-	if !errors.As(err, &validationErrors) {
-		var customValidationErrors CustomValidationErrors
-		if errors.As(err, &customValidationErrors) {
-			for _, err := range customValidationErrors {
-				fieldErrors = append(fieldErrors, errs.FieldError{
-					Field: err.Field,
-					Error: err.Message,
-				})
-			}
+	if errors.As(err, &validationErrors) {
+		fieldErrors := make([]errs.FieldError, 0, len(validationErrors))
+		for _, vErr := range validationErrors {
+			fieldErrors = append(fieldErrors, errs.FieldError{
+				Field: strings.ToLower(vErr.Field()),
+				Error: formatValidatorFieldError(vErr),
+			})
 		}
+		return "Validation failed", fieldErrors
 	}
 
-	for _, err := range validationErrors {
-		field := strings.ToLower(err.Field())
-		var msg string
-
-		switch err.Tag() {
-		case "required":
-			msg = "is required"
-		case "min":
-			if err.Type().Kind() == reflect.String {
-				msg = fmt.Sprintf("must be at least %s characters", err.Param())
-			} else {
-				msg = fmt.Sprintf("must be at least %s", err.Param())
-			}
-		case "max":
-			if err.Type().Kind() == reflect.String {
-				msg = fmt.Sprintf("must not exceed %s characters", err.Param())
-			} else {
-				msg = fmt.Sprintf("must not exceed %s", err.Param())
-			}
-		case "oneof":
-			msg = fmt.Sprintf("must be one of: %s", err.Param())
-		case "email":
-			msg = "must be a valid email address"
-		case "e164":
-			msg = "must be a valid phone number with country code"
-		case "uuid":
-			msg = "must be a valid UUID"
-		case "uuidList":
-			msg = "must be a comma-separated list of valid UUIDs"
-		case "dive":
-			msg = "some items are invalid"
-		default:
-			if err.Param() != "" {
-				msg = fmt.Sprintf("%s: %s:%s", field, err.Tag(), err.Param())
-			} else {
-				msg = fmt.Sprintf("%s: %s", field, err.Tag())
-			}
+	var customValidationErrors CustomValidationErrors
+	if errors.As(err, &customValidationErrors) {
+		fieldErrors := make([]errs.FieldError, 0, len(customValidationErrors))
+		for _, cErr := range customValidationErrors {
+			fieldErrors = append(fieldErrors, errs.FieldError{
+				Field: cErr.Field,
+				Error: cErr.Message,
+			})
 		}
-
-		fieldErrors = append(fieldErrors, errs.FieldError{
-			Field: strings.ToLower(err.Field()),
-			Error: msg,
-		})
+		return "Validation failed", fieldErrors
 	}
 
-	return "Validation failed", fieldErrors
+	return "Validation failed", []errs.FieldError{
+		{
+			Field: "payload",
+			Error: err.Error(),
+		},
+	}
+}
+
+func formatValidatorFieldError(err validator.FieldError) string {
+	field := strings.ToLower(err.Field())
+
+	switch err.Tag() {
+	case "required":
+		return "is required"
+	case "min":
+		if err.Type() != nil && err.Type().Kind() == reflect.String {
+			return fmt.Sprintf("must be at least %s characters", err.Param())
+		}
+		return fmt.Sprintf("must be at least %s", err.Param())
+	case "max":
+		if err.Type() != nil && err.Type().Kind() == reflect.String {
+			return fmt.Sprintf("must not exceed %s characters", err.Param())
+		}
+		return fmt.Sprintf("must not exceed %s", err.Param())
+	case "oneof":
+		return fmt.Sprintf("must be one of: %s", err.Param())
+	case "email":
+		return "must be a valid email address"
+	case "e164":
+		return "must be a valid phone number with country code"
+	case "uuid":
+		return "must be a valid UUID"
+	case "uuidList":
+		return "must be a comma-separated list of valid UUIDs"
+	case "dive":
+		return "some items are invalid"
+	default:
+		if err.Param() != "" {
+			return fmt.Sprintf("%s: %s:%s", field, err.Tag(), err.Param())
+		}
+		return fmt.Sprintf("%s: %s", field, err.Tag())
+	}
 }
 
 var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

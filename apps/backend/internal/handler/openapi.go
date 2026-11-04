@@ -3,9 +3,9 @@ package handler
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/faizan1250/taskify/static"
 
 	"github.com/labstack/echo/v4"
 )
@@ -21,7 +21,7 @@ func NewOpenAPIHandler(s *server.Server) *OpenAPIHandler {
 }
 
 func (h *OpenAPIHandler) ServeOpenAPIUI(c echo.Context) error {
-	templateBytes, err := os.ReadFile("static/openapi.html")
+	templateBytes, err := static.Files.ReadFile("openapi.html")
 	c.Response().Header().Set("Cache-Control", "no-cache")
 	if err != nil {
 		return fmt.Errorf("failed to read OpenAPI UI template: %w", err)

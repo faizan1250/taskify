@@ -325,6 +325,12 @@ func (s *TodoService) DeleteTodoAttachment(
 
 	// Delete from S3 asynchronously
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				s.server.Logger.Error().Interface("panic", r).Msg("recovered panic in S3 attachment deletion")
+			}
+		}()
+
 		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
 		defer cancel()
 

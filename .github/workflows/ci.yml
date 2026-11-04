@@ -80,7 +80,7 @@ jobs:
         run: go build -v -o /dev/null ./cmd/cron
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           working-directory: apps/backend

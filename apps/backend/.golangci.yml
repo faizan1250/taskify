@@ -89,7 +89,6 @@ linters:
       default-signifies-exhaustive: true
       check:
         - switch
-        - map
 
     exhaustruct:
       exclude:

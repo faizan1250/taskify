@@ -4,6 +4,14 @@ import (
 	"net/http"
 )
 
+var (
+	ErrBadRequest          = &HTTPError{Status: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "Bad Request"}
+	ErrUnauthorized        = &HTTPError{Status: http.StatusUnauthorized, Code: "UNAUTHORIZED", Message: "Unauthorized"}
+	ErrForbidden           = &HTTPError{Status: http.StatusForbidden, Code: "FORBIDDEN", Message: "Forbidden"}
+	ErrNotFound            = &HTTPError{Status: http.StatusNotFound, Code: "NOT_FOUND", Message: "Not Found"}
+	ErrInternalServerError = &HTTPError{Status: http.StatusInternalServerError, Code: "INTERNAL_SERVER_ERROR", Message: "Internal Server Error"}
+)
+
 func NewUnauthorizedError(message string, override bool) *HTTPError {
 	return &HTTPError{
 		Code:     MakeUpperCaseWithUnderscores(http.StatusText(http.StatusUnauthorized)),

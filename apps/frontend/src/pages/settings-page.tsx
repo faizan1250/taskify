@@ -1,10 +1,15 @@
+import { Link } from "react-router-dom";
+import { useGetAllCategories } from "@/api/hooks/use-category-query";
+import { useGetTodoStats } from "@/api/hooks/use-todo-query";
 import { useTheme } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { useUser } from "@clerk/clerk-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { useClerk, useUser } from "@clerk/clerk-react";
 import {
   User,
   Palette,
@@ -14,12 +19,43 @@ import {
   ExternalLink,
 } from "lucide-react";
 
+const NOTIFICATION_ROWS = [
+  {
+    title: "Task Reminders",
+    description: "Get notified about upcoming due dates",
+  },
+  {
+    title: "Email Notifications",
+    description: "Receive email updates about your tasks",
+  },
+  {
+    title: "Browser Notifications",
+    description: "Show desktop notifications",
+  },
+];
+
 export function SettingsPage() {
   const { user } = useUser();
+  const { openUserProfile } = useClerk();
   const { theme } = useTheme();
+
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useGetTodoStats();
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+  } = useGetAllCategories({ query: { page: 1, limit: 1 } });
 
   const themeName =
     theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light";
+
+  const statsLoading_ = statsLoading || categoriesLoading;
+  const statsFailed = statsError || categoriesError;
+  const categoryCount = categories?.total ?? categories?.data?.length ?? 0;
 
   return (
     <div className="space-y-6">
@@ -75,7 +111,11 @@ export function SettingsPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" className="w-full">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => openUserProfile()}
+            >
               <ExternalLink className="h-4 w-4 mr-2" />
               Manage Account in Clerk
             </Button>
@@ -122,34 +162,22 @@ export function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Task Reminders</p>
-                  <p className="text-sm text-muted-foreground">
-                    Get notified about upcoming due dates
-                  </p>
+              {NOTIFICATION_ROWS.map((row) => (
+                <div key={row.title} className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium">{row.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {row.description}
+                    </p>
+                  </div>
+                  <Switch disabled checked={false} aria-label={row.title} />
                 </div>
-                <Badge variant="outline">Coming Soon</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Email Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Receive email updates about your tasks
-                  </p>
-                </div>
-                <Badge variant="outline">Coming Soon</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">Browser Notifications</p>
-                  <p className="text-sm text-muted-foreground">
-                    Show desktop notifications
-                  </p>
-                </div>
-                <Badge variant="outline">Coming Soon</Badge>
-              </div>
+              ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Notifications are not available in this version — these controls
+              are shown disabled so nothing looks actionable that isn&apos;t.
+            </p>
           </CardContent>
         </Card>
 
@@ -182,11 +210,6 @@ export function SettingsPage() {
                 </p>
               </div>
             </div>
-            <Separator />
-            <Button variant="outline" className="w-full">
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Privacy Policy
-            </Button>
           </CardContent>
         </Card>
 
@@ -199,38 +222,49 @@ export function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-blue-600">0</p>
-                <p className="text-sm font-medium">Total Tasks</p>
-                <p className="text-xs text-muted-foreground">All time</p>
+            {statsLoading_ ? (
+              <div className="grid gap-4 md:grid-cols-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24 w-full" />
+                ))}
               </div>
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-green-600">0</p>
-                <p className="text-sm font-medium">Completed Tasks</p>
-                <p className="text-xs text-muted-foreground">All time</p>
+            ) : statsFailed ? (
+              <p className="text-sm text-muted-foreground text-center py-4" role="alert">
+                Couldn&apos;t load usage stats. Refresh the page to try again.
+              </p>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {stats?.total ?? 0}
+                  </p>
+                  <p className="text-sm font-medium">Total Tasks</p>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </div>
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">
+                    {stats?.completed ?? 0}
+                  </p>
+                  <p className="text-sm font-medium">Completed Tasks</p>
+                  <p className="text-xs text-muted-foreground">All time</p>
+                </div>
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-2xl font-bold text-purple-600">
+                    {categoryCount}
+                  </p>
+                  <p className="text-sm font-medium">Categories</p>
+                  <p className="text-xs text-muted-foreground">Total created</p>
+                </div>
               </div>
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-2xl font-bold text-purple-600">0</p>
-                <p className="text-sm font-medium">Categories</p>
-                <p className="text-xs text-muted-foreground">Total created</p>
-              </div>
-            </div>
+            )}
             <Separator />
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" className="flex-1">
-                Export Data
-              </Button>
-              <Button variant="outline" className="flex-1">
-                Import Data
-              </Button>
-              <Button variant="destructive" className="flex-1">
-                Delete All Data
-              </Button>
-            </div>
             <p className="text-xs text-muted-foreground text-center">
-              Data export/import and deletion features are coming soon. Contact
-              support if you need immediate assistance.
+              Bulk export, import, and delete-all are not available in this
+              version. Manage individual tasks from the{" "}
+              <Link to="/todos" className="underline underline-offset-2">
+                Todos page
+              </Link>
+              .
             </p>
           </CardContent>
         </Card>

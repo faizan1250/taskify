@@ -61,6 +61,33 @@ function parseOrder(value: string | null): TodosOrder {
   return value === "asc" || value === "desc" ? value : DEFAULT_ORDER;
 }
 
+function parseOverdue(value: string | null): boolean {
+  return value === "true";
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseDueDate(value: string | null): string | null {
+  if (value === null || !DATE_RE.test(value)) return null;
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+  return Number.isNaN(time) ? null : value;
+}
+
+/**
+ * Convert a `YYYY-MM-DD` URL value into an ISO datetime string for the
+ * `dueFrom`/`dueTo` API params. `from` snaps to start-of-day UTC, `to`
+ * snaps to end-of-day UTC so the range is inclusive of both dates.
+ */
+export function toDueBoundISO(
+  date: string | null,
+  bound: "from" | "to",
+): string | undefined {
+  if (date === null) return undefined;
+  return bound === "from"
+    ? `${date}T00:00:00.000Z`
+    : `${date}T23:59:59.999Z`;
+}
+
 function parsePage(value: string | null): number {
   const parsed = Number.parseInt(value ?? "", 10);
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
@@ -81,6 +108,11 @@ function isDefault(key: string, value: string): boolean {
     case "page":
       return value === "1";
     case "q":
+      return value === "";
+    case "overdue":
+      return value === "false";
+    case "dueFrom":
+    case "dueTo":
       return value === "";
     default:
       return false;
@@ -128,6 +160,9 @@ export function useTodosSearchParams() {
   const sort = parseSort(searchParams.get("sort"));
   const order = parseOrder(searchParams.get("order"));
   const page = parsePage(searchParams.get("page"));
+  const overdueOnly = parseOverdue(searchParams.get("overdue"));
+  const dueFrom = parseDueDate(searchParams.get("dueFrom"));
+  const dueTo = parseDueDate(searchParams.get("dueTo"));
 
   const setParam = useCallback(
     (patch: Record<string, string | undefined>, replace = false) => {
@@ -170,6 +205,27 @@ export function useTodosSearchParams() {
       setParam({ page: String(Math.max(1, nextPage)) }, true),
     [setParam],
   );
+  const setOverdueOnly = useCallback(
+    (value: boolean) => setParam({ overdue: value ? "true" : undefined }),
+    [setParam],
+  );
+  const setDueFrom = useCallback(
+    (value: string | undefined) => setParam({ dueFrom: value || undefined }),
+    [setParam],
+  );
+  const setDueTo = useCallback(
+    (value: string | undefined) => setParam({ dueTo: value || undefined }),
+    [setParam],
+  );
+  const setDueRange = useCallback(
+    (from: string | undefined, to: string | undefined) =>
+      setParam({ dueFrom: from || undefined, dueTo: to || undefined }),
+    [setParam],
+  );
+  const clearDueRange = useCallback(
+    () => setParam({ dueFrom: undefined, dueTo: undefined }),
+    [setParam],
+  );
   const clearFilters = useCallback(() => {
     setSearchInput("");
     setSearchParams({}, { replace: true });
@@ -181,7 +237,10 @@ export function useTodosSearchParams() {
     category !== "all" ||
     priority !== DEFAULT_PRIORITY ||
     sort !== DEFAULT_SORT ||
-    order !== DEFAULT_ORDER;
+    order !== DEFAULT_ORDER ||
+    overdueOnly ||
+    dueFrom !== null ||
+    dueTo !== null;
 
   return {
     // URL-derived filter values
@@ -192,6 +251,9 @@ export function useTodosSearchParams() {
     order,
     page,
     sortValue: `${sort}-${order}`,
+    overdueOnly,
+    dueFrom,
+    dueTo,
     // Search: immediate input + debounced URL-backed value
     searchInput,
     setSearchInput,
@@ -202,6 +264,11 @@ export function useTodosSearchParams() {
     setPriority,
     setSortOrder,
     setPage,
+    setOverdueOnly,
+    setDueFrom,
+    setDueTo,
+    setDueRange,
+    clearDueRange,
     clearFilters,
     hasActiveFilters,
   };

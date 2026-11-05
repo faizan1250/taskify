@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -18,8 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  toDueBoundISO,
   useTodosSearchParams,
   type TodosPriorityFilter,
   type TodosSort,
@@ -37,6 +40,9 @@ export function TodosPage() {
     order,
     page,
     sortValue,
+    overdueOnly,
+    dueFrom,
+    dueTo,
     searchInput,
     setSearchInput,
     debouncedSearch,
@@ -45,11 +51,18 @@ export function TodosPage() {
     setPriority,
     setSortOrder,
     setPage,
+    setOverdueOnly,
+    setDueFrom,
+    setDueTo,
+    clearDueRange,
     clearFilters,
     hasActiveFilters,
   } = useTodosSearchParams();
 
   const [selectedTodos, setSelectedTodos] = useState<string[]>([]);
+
+  const dueRangeInvalid =
+    dueFrom !== null && dueTo !== null && dueFrom > dueTo;
 
   const { data: todos, isLoading } = useGetAllTodos({
     query: {
@@ -59,6 +72,11 @@ export function TodosPage() {
       status: tab === "all" ? undefined : tab,
       categoryId: category === "all" ? undefined : category,
       priority: priority === "all" ? undefined : priority,
+      overdue: overdueOnly ? true : undefined,
+      dueFrom: dueRangeInvalid
+        ? undefined
+        : toDueBoundISO(dueFrom, "from"),
+      dueTo: dueRangeInvalid ? undefined : toDueBoundISO(dueTo, "to"),
       sort,
       order,
     },
@@ -191,6 +209,70 @@ export function TodosPage() {
               Clear
             </Button>
           </div>
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 border-t pt-4">
+            <div className="flex items-center gap-2.5">
+              <Switch
+                id="overdue-only"
+                checked={overdueOnly}
+                onCheckedChange={setOverdueOnly}
+                aria-describedby={
+                  stats?.overdue ? "overdue-count" : undefined
+                }
+              />
+              <Label htmlFor="overdue-only" className="cursor-pointer">
+                Overdue only
+              </Label>
+              {typeof stats?.overdue === "number" && stats.overdue > 0 && (
+                <span
+                  id="overdue-count"
+                  className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive"
+                >
+                  {stats.overdue}
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 sm:items-end">
+              <div className="grid gap-1.5">
+                <Label htmlFor="due-from" className="text-xs">
+                  Due from
+                </Label>
+                <Input
+                  id="due-from"
+                  type="date"
+                  value={dueFrom ?? ""}
+                  max={dueTo ?? undefined}
+                  onChange={(e) => setDueFrom(e.target.value || undefined)}
+                  className="w-full sm:w-40"
+                  aria-invalid={dueRangeInvalid}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="due-to" className="text-xs">
+                  Due to
+                </Label>
+                <Input
+                  id="due-to"
+                  type="date"
+                  value={dueTo ?? ""}
+                  min={dueFrom ?? undefined}
+                  onChange={(e) => setDueTo(e.target.value || undefined)}
+                  className="w-full sm:w-40"
+                  aria-invalid={dueRangeInvalid}
+                />
+              </div>
+              {(dueFrom !== null || dueTo !== null) && (
+                <Button variant="ghost" size="sm" onClick={clearDueRange}>
+                  Reset dates
+                </Button>
+              )}
+            </div>
+          </div>
+          {dueRangeInvalid && (
+            <p role="alert" className="text-xs text-destructive">
+              Start date must be on or before the end date — date filter
+              paused until fixed.
+            </p>
+          )}
         </CardContent>
       </Card>
 

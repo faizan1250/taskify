@@ -72,7 +72,7 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
       title: "",
       description: "",
       priority: "medium",
-      categoryId: "",
+      categoryId: "none",
     },
   });
 
@@ -103,7 +103,8 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
           title: data.title,
           description: data.description || undefined,
           priority: data.priority,
-          categoryId: data.categoryId || undefined,
+          categoryId:
+            data.categoryId === "none" ? undefined : data.categoryId || undefined,
           dueDate: data.dueDate?.toISOString(),
         },
       });

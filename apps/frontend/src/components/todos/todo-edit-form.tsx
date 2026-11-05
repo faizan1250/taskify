@@ -79,7 +79,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
       description: todo.description || "",
       status: todo.status,
       priority: todo.priority,
-      categoryId: todo.categoryId || "",
+      categoryId: todo.categoryId || "none",
       dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
     },
   });
@@ -91,7 +91,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
         description: todo.description || "",
         status: todo.status,
         priority: todo.priority,
-        categoryId: todo.categoryId || "",
+        categoryId: todo.categoryId || "none",
         dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
       });
       setAttachments([]);
@@ -127,7 +127,8 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
           description: data.description || undefined,
           status: data.status,
           priority: data.priority,
-          categoryId: data.categoryId || undefined,
+          categoryId:
+            data.categoryId === "none" ? undefined : data.categoryId || undefined,
           dueDate: data.dueDate?.toISOString(),
         },
       });

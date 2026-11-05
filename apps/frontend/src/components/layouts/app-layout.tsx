@@ -1,22 +1,35 @@
-import { type ReactNode } from "react";
-import { UserButton } from "@clerk/clerk-react";
-import { Link, useLocation } from "react-router-dom";
+import {
+  CommandPalette,
+  ShortcutHint,
+  ShortcutsDialog,
+} from "@/components/command-palette";
 import { ErrorBoundary } from "@/components/error-boundary";
-import { Button } from "@/components/ui/button";
+import { useTheme } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TodoCreateForm } from "@/components/todos/todo-create-form";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  displayKeys,
+  openNewTaskDialog,
+  resolveThemeToggle,
+  usePaletteHotkeys,
+} from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
+import { UserButton } from "@clerk/clerk-react";
 import {
   LayoutDashboard,
   CheckSquare,
   Folder,
   Settings,
   Menu,
+  Search,
+  Plus,
+  Keyboard,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-} from "@/components/ui/sheet";
+import { type ReactNode, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -31,20 +44,38 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
+  const { setTheme } = useTheme();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+
+  usePaletteHotkeys({
+    onTogglePalette: () => setPaletteOpen((value) => !value),
+    onOpenPalette: () => setPaletteOpen(true),
+    onOpenShortcuts: () => setShortcutsOpen(true),
+    onNewTask: () => {
+      setPaletteOpen(false);
+      requestAnimationFrame(() => {
+        if (!openNewTaskDialog()) {
+          toast.error("Could not open the New Task dialog");
+        }
+      });
+    },
+    onToggleTheme: () => setTheme(resolveThemeToggle()),
+  });
 
   const NavigationItems = () => (
     <>
       {navigation.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.href;
-        
+
         return (
           <Link key={item.name} to={item.href}>
             <Button
               variant={isActive ? "secondary" : "ghost"}
               className={cn(
                 "w-full justify-start gap-2",
-                isActive && "bg-secondary"
+                isActive && "bg-secondary",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -78,7 +109,11 @@ export function AppLayout({ children }: AppLayoutProps) {
           <h1 className="text-xl font-bold">Taskify</h1>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Open navigation menu">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Open navigation menu"
+              >
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>
@@ -98,9 +133,36 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="md:pl-64">
         {/* Top Bar */}
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-card px-4 sm:gap-x-6 sm:px-6 lg:px-8">
-          <div className="flex flex-1 gap-x-4 self-stretch lg:gap-x-6">
-            <div className="flex flex-1"></div>
-            <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <div className="flex flex-1 items-center gap-x-3 self-stretch py-3">
+            <Button
+              variant="outline"
+              className="h-9 w-full max-w-md justify-start gap-2 font-normal text-muted-foreground"
+              onClick={() => setPaletteOpen(true)}
+              aria-label="Search tasks and commands"
+            >
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="hidden truncate sm:inline">
+                Search tasks, pages, actions…
+              </span>
+              <span className="ml-auto hidden sm:inline-flex">
+                <ShortcutHint keys={displayKeys(["mod", "K"])} />
+              </span>
+            </Button>
+            <div className="ml-auto flex items-center gap-x-1 sm:gap-x-2">
+              <TodoCreateForm>
+                <Button size="sm" data-new-task-trigger>
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden md:inline">New Task</span>
+                </Button>
+              </TodoCreateForm>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Keyboard shortcuts"
+                onClick={() => setShortcutsOpen(true)}
+              >
+                <Keyboard className="h-5 w-5" />
+              </Button>
               <ThemeToggle />
               <UserButton
                 appearance={{
@@ -122,6 +184,13 @@ export function AppLayout({ children }: AppLayoutProps) {
           </div>
         </main>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+      />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
     </div>
   );
 }

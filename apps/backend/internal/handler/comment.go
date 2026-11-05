@@ -6,16 +6,15 @@ import (
 	"github.com/faizan1250/taskify/internal/middleware"
 	"github.com/faizan1250/taskify/internal/model/comment"
 	"github.com/faizan1250/taskify/internal/server"
-	"github.com/faizan1250/taskify/internal/service"
 	"github.com/labstack/echo/v4"
 )
 
 type CommentHandler struct {
 	Handler
-	commentService *service.CommentService
+	commentService CommentServiceContract
 }
 
-func NewCommentHandler(s *server.Server, commentService *service.CommentService) *CommentHandler {
+func NewCommentHandler(s *server.Server, commentService CommentServiceContract) *CommentHandler {
 	return &CommentHandler{
 		Handler:        NewHandler(s),
 		commentService: commentService,

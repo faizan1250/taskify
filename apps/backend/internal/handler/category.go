@@ -7,16 +7,15 @@ import (
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/category"
 	"github.com/faizan1250/taskify/internal/server"
-	"github.com/faizan1250/taskify/internal/service"
 	"github.com/labstack/echo/v4"
 )
 
 type CategoryHandler struct {
 	Handler
-	categoryService *service.CategoryService
+	categoryService CategoryServiceContract
 }
 
-func NewCategoryHandler(s *server.Server, categoryService *service.CategoryService) *CategoryHandler {
+func NewCategoryHandler(s *server.Server, categoryService CategoryServiceContract) *CategoryHandler {
 	return &CategoryHandler{
 		Handler:         NewHandler(s),
 		categoryService: categoryService,

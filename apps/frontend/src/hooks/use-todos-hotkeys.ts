@@ -8,7 +8,7 @@ export interface TodosHotkeysCallbacks {
   onFocusSearch: () => void;
   /** Toggle selection of the todo at the given visible index (X). */
   onToggleSelect: (index: number) => void;
-  /** Open the edit dialog for the active todo (E). */
+  /** Open the detail drawer for the active todo, editing (E). */
   onEditActive: () => void;
   /** Clear selection and reset the active ring (Esc). */
   onClear: () => void;
@@ -26,7 +26,8 @@ interface UseTodosHotkeysOptions extends TodosHotkeysCallbacks {
  *
  * - `C` opens the New Task dialog, `/` focuses search, `J`/`K` move a
  *   roving active ring, `X` toggles selection of the active task,
- *   `E` opens its edit dialog, `Esc` clears selection.
+ *   `E` opens its detail drawer with title editing armed, `Esc` clears
+ *   selection.
  * - Single-key bindings never fire while typing, with modifiers held,
  *   or while any dialog is open (Radix owns Esc/focus there).
  * - `/` is captured (capture phase + stopPropagation) so the global

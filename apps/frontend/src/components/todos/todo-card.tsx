@@ -43,17 +43,21 @@ import {
   Circle,
   Archive,
   Paperclip,
+  PanelRight,
   ChevronDown,
   ChevronRight,
   ListTree,
   Plus,
 } from "lucide-react";
 import { useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 interface TodoCardProps {
   todo: TGetTodosResponse["data"][number];
   compact?: boolean;
+  /** Open the route-less detail drawer. Defaults to setting `?task=<id>`. */
+  onOpenDetails?: (todoId: string) => void;
 }
 
 const priorityConfig = {
@@ -82,11 +86,12 @@ const statusConfig = {
   archived: { icon: Archive, color: "text-gray-500", label: "Archived" },
 };
 
-export function TodoCard({ todo, compact = false }: TodoCardProps) {
+export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [subtasksExpanded, setSubtasksExpanded] = useState(false);
   const [subtaskDialogOpen, setSubtaskDialogOpen] = useState(false);
   const [quickTitle, setQuickTitle] = useState("");
+  const [, setSearchParams] = useSearchParams();
   const [pendingSubtasks, setPendingSubtasks] = useState<
     { key: number; title: string }[]
   >([]);
@@ -94,6 +99,17 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const createTodo = useCreateTodo();
+
+  // Route-less drawer: push so browser Back closes it again.
+  const openDetails =
+    onOpenDetails ??
+    ((todoId: string) =>
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("task", todoId);
+        next.delete("edit");
+        return next;
+      }));
 
   const StatusIcon = statusConfig[todo.status].icon;
   const subtasks = todo.children ?? [];
@@ -187,7 +203,15 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                           "line-through text-muted-foreground",
                       )}
                     >
-                      {todo.title}
+                      <button
+                        type="button"
+                        onClick={() => openDetails(todo.id)}
+                        aria-label={`Open details for ${todo.title}`}
+                        title={`Open details for ${todo.title}`}
+                        className="truncate text-left transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                      >
+                        {todo.title}
+                      </button>
                     </h3>
                     {isOverdue && (
                       <span
@@ -216,6 +240,11 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => openDetails(todo.id)}>
+                    <PanelRight className="h-4 w-4 mr-2" />
+                    Open details
+                  </DropdownMenuItem>
+
                   <TodoEditForm todo={todo}>
                     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                       <Edit className="h-4 w-4 mr-2" />

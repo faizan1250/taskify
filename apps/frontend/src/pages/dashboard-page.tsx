@@ -5,6 +5,7 @@ import { useGetTodoStats, useGetAllTodos } from "@/api/hooks/use-todo-query";
 import { useGetAllCategories } from "@/api/hooks/use-category-query";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
+import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle,
@@ -203,6 +204,9 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Route-less detail drawer (`?task=<id>`) for recent-task cards. */}
+      <TodoDetailDrawer />
     </div>
   );
 }

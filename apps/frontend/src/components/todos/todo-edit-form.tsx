@@ -479,6 +479,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
                           size="sm"
                           onClick={() => removeAttachment(index)}
                           disabled={updateTodo.isPending}
+                          aria-label={`Remove attachment ${file.name}`}
                         >
                           <X className="h-4 w-4" />
                         </Button>

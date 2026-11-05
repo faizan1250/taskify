@@ -116,6 +116,7 @@ export function TodoAttachments({
                   onClick={() => handleDownload(attachment)}
                   disabled={disabled || getPresignedUrl.isPending}
                   title="Download attachment"
+                  aria-label={`Download attachment ${attachment.name}`}
                 >
                   <Download className="h-4 w-4" />
                 </Button>
@@ -132,6 +133,7 @@ export function TodoAttachments({
                   disabled={disabled || deleteAttachment.isPending}
                   className="text-destructive hover:text-destructive"
                   title="Delete attachment"
+                  aria-label={`Delete attachment ${attachment.name}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

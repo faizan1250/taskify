@@ -133,6 +133,7 @@ export function CategoriesPage() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label={`Category actions for ${category.name}`}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>

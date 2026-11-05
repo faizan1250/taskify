@@ -365,3 +365,65 @@ func TestDeleteTodo_S3Cleanup_PanicRecovery(t *testing.T) {
 		assert.Equal(t, "simulated S3 failure deleting key-2", recovered)
 	})
 }
+
+// scriptedS3Deleter fails the first failTimes calls, then succeeds,
+// recording how many attempts ran. A negative failTimes fails forever.
+type scriptedS3Deleter struct {
+	mu        sync.Mutex
+	failTimes int
+	calls     int
+}
+
+func (f *scriptedS3Deleter) DeleteObject(ctx context.Context, bucket, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls++
+	if f.failTimes < 0 || f.calls <= f.failTimes {
+		return errors.New("simulated transient S3 error")
+	}
+	return nil
+}
+
+func (f *scriptedS3Deleter) attemptCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls
+}
+
+func TestDeleteS3ObjectWithRetry(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("succeeds on first attempt without retry", func(t *testing.T) {
+		deleter := &scriptedS3Deleter{}
+		attempts, err := service.DeleteS3ObjectWithRetryForTest(ctx, deleter, "bucket", "key")
+		require.NoError(t, err)
+		assert.Equal(t, 1, attempts)
+		assert.Equal(t, 1, deleter.attemptCount())
+	})
+
+	t.Run("retries transient failures then succeeds", func(t *testing.T) {
+		deleter := &scriptedS3Deleter{failTimes: 2}
+		attempts, err := service.DeleteS3ObjectWithRetryForTest(ctx, deleter, "bucket", "key")
+		require.NoError(t, err)
+		assert.Equal(t, 3, attempts)
+		assert.Equal(t, 3, deleter.attemptCount())
+	})
+
+	t.Run("gives up after three attempts on persistent failure", func(t *testing.T) {
+		deleter := &scriptedS3Deleter{failTimes: -1}
+		attempts, err := service.DeleteS3ObjectWithRetryForTest(ctx, deleter, "bucket", "key")
+		require.Error(t, err)
+		assert.Equal(t, 3, attempts)
+		assert.Equal(t, 3, deleter.attemptCount())
+	})
+
+	t.Run("aborts early when context is cancelled", func(t *testing.T) {
+		cancelCtx, cancel := context.WithCancel(ctx)
+		cancel()
+		deleter := &scriptedS3Deleter{failTimes: -1}
+		attempts, err := service.DeleteS3ObjectWithRetryForTest(cancelCtx, deleter, "bucket", "key")
+		require.Error(t, err)
+		assert.Equal(t, 1, attempts)
+		assert.Equal(t, 1, deleter.attemptCount())
+	})
+}

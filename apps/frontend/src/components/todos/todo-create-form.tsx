@@ -37,7 +37,7 @@ import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { CalendarIcon, Upload, X } from "lucide-react";
-import { type ReactNode, useState, useRef } from "react";
+import { type ReactNode, useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -61,12 +61,18 @@ interface TodoCreateFormProps {
    */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * Preselects the Parent Task field, used by the per-task "Add subtask"
+   * quick action. The dialog resets back to it on every open.
+   */
+  defaultParentId?: string;
 }
 
 export function TodoCreateForm({
   children,
   open,
   onOpenChange,
+  defaultParentId,
 }: TodoCreateFormProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = open !== undefined;
@@ -88,6 +94,9 @@ export function TodoCreateForm({
   const parentCandidates = (todos?.data ?? []).filter(
     (t) => t.parentTodoId == null,
   );
+  const defaultParentName = defaultParentId
+    ? (todos?.data ?? []).find((t) => t.id === defaultParentId)?.title
+    : undefined;
 
   const form = useForm<CreateTodoForm>({
     resolver: zodResolver(createTodoSchema),
@@ -96,9 +105,25 @@ export function TodoCreateForm({
       description: "",
       priority: "medium",
       categoryId: "none",
-      parentTodoId: "none",
+      parentTodoId: defaultParentId ?? "none",
     },
   });
+
+  // Every open starts from a clean slate, preselecting the quick-action
+  // parent when one was provided.
+  useEffect(() => {
+    if (dialogOpen) {
+      form.reset({
+        title: "",
+        description: "",
+        priority: "medium",
+        categoryId: "none",
+        parentTodoId: defaultParentId ?? "none",
+        dueDate: undefined,
+      });
+      setAttachments([]);
+    }
+  }, [dialogOpen, defaultParentId, form]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -146,7 +171,14 @@ export function TodoCreateForm({
       }
 
       toast.success("Task created successfully!");
-      form.reset();
+      form.reset({
+        title: "",
+        description: "",
+        priority: "medium",
+        categoryId: "none",
+        parentTodoId: defaultParentId ?? "none",
+        dueDate: undefined,
+      });
       setAttachments([]);
       handleOpenChange(false);
     } catch {
@@ -308,7 +340,13 @@ export function TodoCreateForm({
                       ))}
                     </SelectContent>
                   </Select>
-                  <FormMessage />
+                  {defaultParentId && defaultParentName ? (
+                    <p className="text-xs text-muted-foreground">
+                      Creating a subtask of “{defaultParentName}”.
+                    </p>
+                  ) : (
+                    <FormMessage />
+                  )}
                 </FormItem>
               )}
             />

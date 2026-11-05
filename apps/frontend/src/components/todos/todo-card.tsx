@@ -1,6 +1,9 @@
 import { TodoCommentsDialog } from "./todo-comments-dialog";
+import { TodoCreateForm } from "./todo-create-form";
 import { TodoEditForm } from "./todo-edit-form";
+import { SubtaskGhostRow, SubtaskRow } from "./subtask-row";
 import {
+  useCreateTodo,
   useUpdateTodo,
   useDeleteTodo,
   type TGetTodosResponse,
@@ -19,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import {
   MoreHorizontal,
@@ -41,8 +46,9 @@ import {
   ChevronDown,
   ChevronRight,
   ListTree,
+  Plus,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface TodoCardProps {
@@ -79,14 +85,43 @@ const statusConfig = {
 export function TodoCard({ todo, compact = false }: TodoCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [subtasksExpanded, setSubtasksExpanded] = useState(false);
+  const [subtaskDialogOpen, setSubtaskDialogOpen] = useState(false);
+  const [quickTitle, setQuickTitle] = useState("");
+  const [pendingSubtasks, setPendingSubtasks] = useState<
+    { key: number; title: string }[]
+  >([]);
+  const pendingKey = useRef(0);
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const createTodo = useCreateTodo();
 
   const StatusIcon = statusConfig[todo.status].icon;
   const subtasks = todo.children ?? [];
   const completedSubtasks = subtasks.filter(
     (child) => child.status === "completed",
   ).length;
+  const subtaskProgress =
+    subtasks.length > 0
+      ? Math.round((completedSubtasks / subtasks.length) * 100)
+      : 0;
+
+  const handleQuickAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = quickTitle.trim();
+    if (!title || createTodo.isPending) return;
+    const key = ++pendingKey.current;
+    setQuickTitle("");
+    setPendingSubtasks((prev) => [...prev, { key, title }]);
+    try {
+      await createTodo.mutateAsync({
+        body: { title, parentTodoId: todo.id },
+      });
+    } catch {
+      toast.error("Failed to add subtask");
+    } finally {
+      setPendingSubtasks((prev) => prev.filter((p) => p.key !== key));
+    }
+  };
 
   const handleStatusToggle = async () => {
     const newStatus = todo.status === "completed" ? "active" : "completed";
@@ -101,17 +136,6 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
         ? "Task marked as completed!"
         : "Task marked as active",
     );
-  };
-
-  const handleSubtaskToggle = async (childId: string, completed: boolean) => {
-    try {
-      await updateTodo.mutateAsync({
-        todoId: childId,
-        body: { status: completed ? "active" : "completed" },
-      });
-    } catch {
-      toast.error("Failed to update subtask");
-    }
   };
 
   const handleDelete = async () => {
@@ -263,26 +287,56 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                   </Badge>
                 )}
 
-                {subtasks.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1 h-6 px-2 text-xs"
-                    onClick={() => setSubtasksExpanded((v) => !v)}
-                    aria-expanded={subtasksExpanded}
-                    aria-label={
-                      subtasksExpanded ? "Collapse subtasks" : "Expand subtasks"
-                    }
-                  >
-                    <ListTree className="h-3 w-3" />
-                    {completedSubtasks}/{subtasks.length}
-                    {subtasksExpanded ? (
-                      <ChevronDown className="h-3 w-3" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3" />
+                {subtasks.length > 0 ? (
+                  <div className="flex items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1 h-6 px-2 text-xs"
+                      onClick={() => setSubtasksExpanded((v) => !v)}
+                      aria-expanded={subtasksExpanded}
+                      aria-label={
+                        subtasksExpanded
+                          ? "Collapse subtasks"
+                          : "Expand subtasks"
+                      }
+                    >
+                      <ListTree className="h-3 w-3" />
+                      {completedSubtasks}/{subtasks.length}
+                      {subtasksExpanded ? (
+                        <ChevronDown className="h-3 w-3" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                    </Button>
+                    {!compact && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSubtaskDialogOpen(true)}
+                        aria-label={`Add subtask to ${todo.title}`}
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                      </Button>
                     )}
-                  </Button>
+                  </div>
+                ) : (
+                  !compact && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-xs text-muted-foreground"
+                      onClick={() => setSubtaskDialogOpen(true)}
+                      aria-label={`Add subtask to ${todo.title}`}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Add subtask
+                    </Button>
+                  )
                 )}
               </div>
 
@@ -296,54 +350,60 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
             </div>
 
             {/* Expandable subtasks */}
-            {subtasksExpanded && subtasks.length > 0 && (
-              <ul className="mt-1 space-y-1 border-t pt-2" aria-label="Subtasks">
-                {subtasks.map((child) => {
-                  const isDone = child.status === "completed";
-                  return (
-                    <li
-                      key={child.id}
-                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60"
+            {subtasksExpanded &&
+              (subtasks.length > 0 || pendingSubtasks.length > 0) && (
+                <div className="mt-1 space-y-2 border-t pt-2">
+                  <div className="flex items-center gap-2 px-2">
+                    <Progress
+                      value={subtaskProgress}
+                      className="h-1.5 flex-1"
+                      aria-label={`${completedSubtasks} of ${subtasks.length} subtasks complete`}
+                    />
+                    <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                      {completedSubtasks}/{subtasks.length}
+                    </span>
+                  </div>
+                  <ul className="space-y-1" aria-label="Subtasks">
+                    {subtasks.map((child) => (
+                      <SubtaskRow key={child.id} subtask={child} />
+                    ))}
+                    {pendingSubtasks.map((p) => (
+                      <SubtaskGhostRow key={p.key} title={p.title} />
+                    ))}
+                  </ul>
+                  {!compact && (
+                    <form
+                      onSubmit={(e) => void handleQuickAdd(e)}
+                      className="flex items-center gap-2 px-2"
                     >
-                      <Checkbox
-                        checked={isDone}
-                        onCheckedChange={() =>
-                          handleSubtaskToggle(child.id, isDone)
-                        }
-                        disabled={updateTodo.isPending}
-                        aria-label={`Toggle subtask ${child.title}`}
-                        className="h-3.5 w-3.5"
+                      <Plus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <Input
+                        value={quickTitle}
+                        onChange={(e) => setQuickTitle(e.target.value)}
+                        placeholder="Add a subtask, press Enter"
+                        aria-label={`Add a subtask to ${todo.title}`}
+                        disabled={createTodo.isPending}
+                        className="h-7 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
                       />
-                      <span
-                        className={cn(
-                          "flex-1 truncate text-sm",
-                          isDone && "line-through text-muted-foreground",
-                        )}
-                      >
-                        {child.title}
-                      </span>
-                      {child.priority && (
-                        <span
-                          className={cn(
-                            "h-1.5 w-1.5 rounded-full shrink-0",
-                            child.priority === "high" && "bg-red-500",
-                            child.priority === "medium" && "bg-yellow-500",
-                            child.priority === "low" && "bg-green-500",
-                          )}
-                          title={`${child.priority} priority`}
-                        />
-                      )}
-                      <span className="shrink-0 text-[11px] capitalize text-muted-foreground">
-                        {child.status}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
+                    </form>
+                  )}
+                  <p className="px-2 text-[11px] text-muted-foreground">
+                    Subtasks stay one level deep — convert one to a top-level
+                    task to break it out.
+                  </p>
+                </div>
+              )}
           </div>
         </CardContent>
       </Card>
+
+      <TodoCreateForm
+        defaultParentId={todo.id}
+        open={subtaskDialogOpen}
+        onOpenChange={setSubtaskDialogOpen}
+      >
+        <span className="hidden" aria-hidden />
+      </TodoCreateForm>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

@@ -92,21 +92,17 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
 
   const handleStatusToggle = async () => {
     const newStatus = todo.status === "completed" ? "active" : "completed";
-    try {
-      await updateTodo.mutateAsync({
-        todoId: todo.id,
-        body: {
-          status: newStatus,
-        },
-      });
-      toast.success(
-        newStatus === "completed"
-          ? "Task marked as completed!"
-          : "Task marked as active",
-      );
-    } catch {
-      toast.error("Failed to update task status");
-    }
+    await updateTodo.mutateAsync({
+      todoId: todo.id,
+      body: {
+        status: newStatus,
+      },
+    });
+    toast.success(
+      newStatus === "completed"
+        ? "Task marked as completed!"
+        : "Task marked as active",
+    );
   };
 
   const handleSubtaskToggle = async (childId: string, completed: boolean) => {

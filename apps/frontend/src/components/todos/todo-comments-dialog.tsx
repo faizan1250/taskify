@@ -100,19 +100,15 @@ export function TodoCommentsDialog({ todoId, children }: TodoCommentsDialogProps
   });
 
   const onSubmit = async (data: CommentForm) => {
-    try {
-      await addComment.mutateAsync({
-        body: {
-          todoId,
-          content: data.content,
-        },
-      });
-      
-      toast.success("Comment added successfully!");
-      form.reset();
-    } catch {
-      toast.error("Failed to add comment");
-    }
+    await addComment.mutateAsync({
+      body: {
+        todoId,
+        content: data.content,
+      },
+    });
+
+    toast.success("Comment added successfully!");
+    form.reset();
   };
 
   const onEditSubmit = async (data: CommentForm) => {

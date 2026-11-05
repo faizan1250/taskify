@@ -194,7 +194,63 @@ export const useUpdateTodo = () => {
   return useMutation({
     mutationFn: ({ todoId, body }: { todoId: string; body: TUpdateTodoPayload }) =>
       updateTodo({ api, id: todoId, data: body }),
-    onSuccess: (_, { todoId }) => {
+    onMutate: async ({ todoId, body }) => {
+      await queryClient.cancelQueries({
+        queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
+      });
+      await queryClient.cancelQueries({
+        queryKey: [QUERY_KEYS.TODOS.GET_TODO_BY_ID, todoId],
+      });
+
+      const previousLists = queryClient.getQueriesData<TGetTodosResponse>({
+        queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
+      });
+      const previousDetail = queryClient.getQueryData<TGetTodoByIdResponse>([
+        QUERY_KEYS.TODOS.GET_TODO_BY_ID,
+        todoId,
+      ]);
+
+      previousLists.forEach(([queryKey, cached]) => {
+        if (!cached) return;
+        queryClient.setQueryData<TGetTodosResponse>(queryKey, {
+          ...cached,
+          data: cached.data.map((todo) => {
+            if (todo.id === todoId) return { ...todo, ...body };
+            if (todo.children?.some((child) => child.id === todoId)) {
+              return {
+                ...todo,
+                children: todo.children.map((child) =>
+                  child.id === todoId ? { ...child, ...body } : child,
+                ),
+              };
+            }
+            return todo;
+          }),
+        });
+      });
+
+      if (previousDetail) {
+        queryClient.setQueryData<TGetTodoByIdResponse>(
+          [QUERY_KEYS.TODOS.GET_TODO_BY_ID, todoId],
+          { ...previousDetail, ...body },
+        );
+      }
+
+      return { previousLists, previousDetail, todoId };
+    },
+    onError: (err, _vars, context) => {
+      context?.previousLists.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
+      if (context?.previousDetail) {
+        queryClient.setQueryData(
+          [QUERY_KEYS.TODOS.GET_TODO_BY_ID, context.todoId],
+          context.previousDetail,
+        );
+      }
+      showApiErrorToast(err, "Failed to update todo");
+    },
+    onSettled: (_, __, { todoId }) => {
       queryClient.invalidateQueries({
         queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
       });
@@ -204,9 +260,6 @@ export const useUpdateTodo = () => {
       queryClient.invalidateQueries({
         queryKey: [QUERY_KEYS.TODOS.TODO_STATS],
       });
-    },
-    onError: (err) => {
-      showApiErrorToast(err, "Failed to update todo");
     },
   });
 };

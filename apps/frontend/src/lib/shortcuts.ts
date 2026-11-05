@@ -9,7 +9,17 @@ import { useEffect, useRef } from "react";
  */
 
 export interface ShortcutDef {
-  id: "palette" | "search" | "new-task" | "toggle-theme" | "shortcuts-help";
+  id:
+    | "palette"
+    | "search"
+    | "new-task"
+    | "toggle-theme"
+    | "shortcuts-help"
+    | "list-create"
+    | "list-navigate"
+    | "list-select"
+    | "list-edit"
+    | "list-clear";
   /** Short label used in toasts / aria text. */
   label: string;
   /** One-line description shown in the shortcuts dialog. */
@@ -48,6 +58,36 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
     label: "Shortcuts",
     description: "Show all keyboard shortcuts",
     keys: ["?"],
+  },
+  {
+    id: "list-create",
+    label: "New task (list)",
+    description: "Task list: open the New Task dialog",
+    keys: ["C"],
+  },
+  {
+    id: "list-navigate",
+    label: "Move active task",
+    description: "Task list: move the active ring down (J) / up (K)",
+    keys: ["J", "K"],
+  },
+  {
+    id: "list-select",
+    label: "Select active task",
+    description: "Task list: toggle selection of the active task",
+    keys: ["X"],
+  },
+  {
+    id: "list-edit",
+    label: "Edit active task",
+    description: "Task list: open the edit dialog for the active task",
+    keys: ["E"],
+  },
+  {
+    id: "list-clear",
+    label: "Clear selection",
+    description: "Task list: clear selection and reset the active task",
+    keys: ["Esc"],
   },
 ];
 

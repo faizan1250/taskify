@@ -19,7 +19,7 @@ func isValidRequestID(s string) bool {
 	if s == "" || len(s) > maxRequestIDLen {
 		return false
 	}
-	for i := 0; i < len(s); i++ {
+	for i := range len(s) {
 		c := s[i]
 		if (c < 'a' || c > 'z') && (c < 'A' || c > 'Z') && (c < '0' || c > '9') && c != '-' {
 			return false

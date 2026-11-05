@@ -123,6 +123,12 @@ function parsePage(value: string | null): number {
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
 }
 
+function parseTaskId(value: string | null): string | null {
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 function isDefault(key: string, value: string): boolean {
   switch (key) {
     case "tab":
@@ -143,6 +149,11 @@ function isDefault(key: string, value: string): boolean {
       return value === "false";
     case "dueFrom":
     case "dueTo":
+      return value === "";
+    case "task":
+    case "edit":
+      // `task`/`edit` are selection state, not filters — their absence is
+      // the default, so `setParam` deletes them when unset.
       return value === "";
     default:
       return false;
@@ -193,6 +204,9 @@ export function useTodosSearchParams() {
   const overdueOnly = parseOverdue(searchParams.get("overdue"));
   const dueFrom = parseDueDate(searchParams.get("dueFrom"));
   const dueTo = parseDueDate(searchParams.get("dueTo"));
+  // Route-less detail drawer selection. `?task=<id>` deep-links a task;
+  // `?task=<id>&edit=1` additionally arms inline title editing on open.
+  const selectedTaskId = parseTaskId(searchParams.get("task"));
 
   const setParam = useCallback(
     (patch: Record<string, string | undefined>, replace = false) => {
@@ -252,6 +266,33 @@ export function useTodosSearchParams() {
       setParam({ dueFrom: from || undefined, dueTo: to || undefined }),
     [setParam],
   );
+  /**
+   * Open (`id`) or close (`undefined`) the route-less detail drawer.
+   * Unlike filter setters this never touches `page` — selecting a task
+   * must not reset pagination. Opening pushes a history entry so the
+   * browser Back button closes the drawer; closing replaces to avoid a
+   * reopen-on-back loop. `edit: true` arms inline title editing on open.
+   */
+  const setSelectedTaskId = useCallback(
+    (id: string | undefined, options?: { edit?: boolean }) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (id === undefined) {
+            next.delete("task");
+            next.delete("edit");
+          } else {
+            next.set("task", id);
+            if (options?.edit) next.set("edit", "1");
+            else next.delete("edit");
+          }
+          return next;
+        },
+        { replace: id === undefined },
+      );
+    },
+    [setSearchParams],
+  );
   const clearDueRange = useCallback(
     () => setParam({ dueFrom: undefined, dueTo: undefined }),
     [setParam],
@@ -293,6 +334,8 @@ export function useTodosSearchParams() {
     overdueOnly,
     dueFrom,
     dueTo,
+    // Route-less detail drawer selection (`?task=<id>`)
+    selectedTaskId,
     // Search: immediate input + debounced URL-backed value
     searchInput,
     setSearchInput,
@@ -307,6 +350,7 @@ export function useTodosSearchParams() {
     setDueFrom,
     setDueTo,
     setDueRange,
+    setSelectedTaskId,
     clearDueRange,
     clearFilters,
     hasActiveFilters,

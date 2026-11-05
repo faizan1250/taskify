@@ -7,7 +7,7 @@ import {
 import { ShortcutHint } from "@/components/command-palette";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
-import { TodoEditForm } from "@/components/todos/todo-edit-form";
+import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +69,7 @@ export function TodosPage() {
     setDueTo,
     clearDueRange,
     clearFilters,
+    setSelectedTaskId,
     hasActiveFilters,
     activeFilterCount,
   } = useTodosSearchParams();
@@ -77,7 +78,6 @@ export function TodosPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
-  const keyboardEditTriggerRef = useRef<HTMLButtonElement>(null);
 
   const dueRangeInvalid =
     dueFrom !== null && dueTo !== null && dueFrom > dueTo;
@@ -189,7 +189,10 @@ export function TodosPage() {
         handleSelectTodo(target.id, !selectedTodos.includes(target.id));
       }
     },
-    onEditActive: () => keyboardEditTriggerRef.current?.click(),
+    onEditActive: () => {
+      const target = visibleTodos[activeIndex];
+      if (target) setSelectedTaskId(target.id, { edit: true });
+    },
     onClear: () => {
       setSelectedTodos([]);
       setActiveIndex(0);
@@ -658,19 +661,8 @@ export function TodosPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Hidden trigger: the `E` hotkey opens the edit dialog for the
-          active task without touching the per-card dropdown menu. */}
-      {activeTodo && (
-        <TodoEditForm key={activeTodo.id} todo={activeTodo}>
-          <button
-            ref={keyboardEditTriggerRef}
-            type="button"
-            tabIndex={-1}
-            aria-hidden="true"
-            className="sr-only"
-          />
-        </TodoEditForm>
-      )}
+      {/* Route-less detail drawer (`?task=<id>`); `E` opens it in edit mode. */}
+      <TodoDetailDrawer />
     </div>
   );
 }

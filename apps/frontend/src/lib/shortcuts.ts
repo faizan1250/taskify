@@ -80,7 +80,7 @@ export const SHORTCUT_DEFS: readonly ShortcutDef[] = [
   {
     id: "list-edit",
     label: "Edit active task",
-    description: "Task list: open the edit dialog for the active task",
+    description: "Task list: open the active task in the detail drawer, editing",
     keys: ["E"],
   },
   {

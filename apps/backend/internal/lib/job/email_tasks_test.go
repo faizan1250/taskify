@@ -28,17 +28,17 @@ func TestGenerateReminderTaskID_DueDateReminder(t *testing.T) {
 	}
 
 	taskID1 := job.GenerateReminderTaskID(task1)
-	expected := "due_date_reminder:12345678-1234-1234-1234-123456789abc:2026-11-10"
+	expected := "due_date_reminder:12345678-1234-1234-1234-123456789abc:2026-11-10T14:30:00Z"
 	assert.Equal(t, expected, taskID1)
 
-	// Same todo and same date but different time of day must produce the identical TaskID
+	// Same todo and same date but different time of day must produce a distinct TaskID
 	dueDateLater := time.Date(2026, 11, 10, 23, 59, 59, 0, time.UTC)
 	task2 := &job.ReminderEmailTask{
 		TodoID:   todoID,
 		DueDate:  dueDateLater,
 		TaskType: "due_date_reminder",
 	}
-	assert.Equal(t, taskID1, job.GenerateReminderTaskID(task2))
+	assert.NotEqual(t, taskID1, job.GenerateReminderTaskID(task2))
 
 	// Different date produces different TaskID
 	dueDateDifferent := time.Date(2026, 11, 11, 14, 30, 0, 0, time.UTC)
@@ -61,21 +61,21 @@ func TestGenerateReminderTaskID_DueDateReminder(t *testing.T) {
 
 func TestGenerateReminderTaskID_OverdueNotification(t *testing.T) {
 	todoID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	todayStr := time.Now().UTC().Format("2006-01-02")
+	dueDate := time.Date(2026, 11, 10, 14, 30, 0, 0, time.UTC)
 
 	task := &job.ReminderEmailTask{
 		TodoID:   todoID,
+		DueDate:  dueDate,
 		TaskType: "overdue_notification",
 	}
 
 	taskID := job.GenerateReminderTaskID(task)
-	expected := "overdue_notification:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + todayStr
+	expected := "overdue_notification:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:2026-11-10T14:30:00Z"
 	assert.Equal(t, expected, taskID)
 }
 
 func TestGenerateReminderTaskID_CustomType(t *testing.T) {
 	todoID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
-	todayStr := time.Now().UTC().Format("2006-01-02")
 
 	task := &job.ReminderEmailTask{
 		TodoID:   todoID,
@@ -83,8 +83,11 @@ func TestGenerateReminderTaskID_CustomType(t *testing.T) {
 	}
 
 	taskID := job.GenerateReminderTaskID(task)
-	expected := "custom_type:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:" + todayStr
-	assert.Equal(t, expected, taskID)
+	prefix := "custom_type:aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee:"
+	require.True(t, len(taskID) > len(prefix), "task ID %q missing timestamp suffix", taskID)
+	assert.Equal(t, prefix, taskID[:len(prefix)])
+	_, err := time.Parse(time.RFC3339, taskID[len(prefix):])
+	assert.NoError(t, err, "timestamp suffix must be full RFC3339 granularity")
 }
 
 type mockTodoRepo struct {

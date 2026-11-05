@@ -8,6 +8,36 @@ export type TodosPriorityFilter = "low" | "medium" | "high" | "all";
 export type TodosSort = NonNullable<TGetTodosQuery["sort"]>;
 export type TodosOrder = "asc" | "desc";
 
+export interface TodosSortOption {
+  value: `${TodosSort}-${TodosOrder}`;
+  label: string;
+}
+
+/**
+ * Single source of truth for the sort dropdown and filter-chip labels.
+ * Every `TodosSort` the API accepts is represented — including
+ * `created_at` and `status`, which the dropdown previously omitted.
+ */
+export const TODOS_SORT_OPTIONS: readonly TodosSortOption[] = [
+  { value: "updated_at-desc", label: "Latest" },
+  { value: "updated_at-asc", label: "Oldest" },
+  { value: "created_at-desc", label: "Newest created" },
+  { value: "created_at-asc", label: "Oldest created" },
+  { value: "title-asc", label: "Title A-Z" },
+  { value: "title-desc", label: "Title Z-A" },
+  { value: "priority-desc", label: "High Priority" },
+  { value: "status-asc", label: "Status A-Z" },
+  { value: "status-desc", label: "Status Z-A" },
+  { value: "due_date-asc", label: "Due Date" },
+] as const;
+
+export function getTodosSortLabel(sortValue: string): string {
+  return (
+    TODOS_SORT_OPTIONS.find((option) => option.value === sortValue)?.label ??
+    sortValue
+  );
+}
+
 const TABS: readonly TodosTab[] = [
   "all",
   "draft",
@@ -242,6 +272,15 @@ export function useTodosSearchParams() {
     dueFrom !== null ||
     dueTo !== null;
 
+  const activeFilterCount =
+    (debouncedSearch !== "" ? 1 : 0) +
+    (category !== "all" ? 1 : 0) +
+    (priority !== DEFAULT_PRIORITY ? 1 : 0) +
+    (sort !== DEFAULT_SORT || order !== DEFAULT_ORDER ? 1 : 0) +
+    (overdueOnly ? 1 : 0) +
+    (dueFrom !== null ? 1 : 0) +
+    (dueTo !== null ? 1 : 0);
+
   return {
     // URL-derived filter values
     tab,
@@ -271,5 +310,6 @@ export function useTodosSearchParams() {
     clearDueRange,
     clearFilters,
     hasActiveFilters,
+    activeFilterCount,
   };
 }

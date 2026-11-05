@@ -1,19 +1,20 @@
-package config
+package config_test
 
 import (
 	"testing"
 
+	"github.com/faizan1250/taskify/internal/config"
 	"github.com/go-playground/validator/v10"
 )
 
 func TestCronApplyDefaultsPartial(t *testing.T) {
-	c := &CronConfig{BatchSize: 50}
-	c.applyDefaults(DefaultCronConfig())
+	c := &config.CronConfig{BatchSize: 50}
+	c.ApplyDefaultsForTest(config.DefaultCronConfig())
 
 	if c.BatchSize != 50 {
 		t.Fatalf("explicit BatchSize overwritten: got %d, want 50", c.BatchSize)
 	}
-	def := DefaultCronConfig()
+	def := config.DefaultCronConfig()
 	if c.ArchiveDaysThreshold != def.ArchiveDaysThreshold {
 		t.Errorf("ArchiveDaysThreshold: got %d, want default %d", c.ArchiveDaysThreshold, def.ArchiveDaysThreshold)
 	}
@@ -30,17 +31,17 @@ func TestCronApplyDefaultsPartial(t *testing.T) {
 }
 
 func TestCronApplyDefaultsAllZero(t *testing.T) {
-	c := &CronConfig{}
-	c.applyDefaults(DefaultCronConfig())
+	c := &config.CronConfig{}
+	c.ApplyDefaultsForTest(config.DefaultCronConfig())
 
-	if *c != *DefaultCronConfig() {
+	if *c != *config.DefaultCronConfig() {
 		t.Fatalf("all-zero CronConfig not fully defaulted: got %+v", c)
 	}
 }
 
 func TestCronNegativeSurvivesForValidation(t *testing.T) {
-	c := &CronConfig{ArchiveDaysThreshold: -5}
-	c.applyDefaults(DefaultCronConfig())
+	c := &config.CronConfig{ArchiveDaysThreshold: -5}
+	c.ApplyDefaultsForTest(config.DefaultCronConfig())
 
 	if c.ArchiveDaysThreshold != -5 {
 		t.Fatalf("negative value masked by default: got %d", c.ArchiveDaysThreshold)

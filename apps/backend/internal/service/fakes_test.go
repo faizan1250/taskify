@@ -33,18 +33,18 @@ func newEchoCtx() echo.Context {
 // ---------------------------------------------------------------------------
 
 type FakeTodoRepository struct {
-	CreateTodoFn                      func(ctx context.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error)
-	GetTodoByIDFn                     func(ctx context.Context, userID string, todoID uuid.UUID) (*todo.PopulatedTodo, error)
-	CheckTodoExistsFn                 func(ctx context.Context, userID string, todoID uuid.UUID) (*todo.Todo, error)
-	GetTodosFn                        func(ctx context.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
-	UpdateTodoFn                      func(ctx context.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
-	DeleteTodoFn                      func(ctx context.Context, userID string, todoID uuid.UUID) error
-	GetTodoStatsFn                    func(ctx context.Context, userID string) (*todo.TodoStats, error)
-	GetTodoAttachmentFn               func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) (*todo.TodoAttachment, error)
-	GetTodoAttachmentsFn              func(ctx context.Context, todoID uuid.UUID) ([]todo.TodoAttachment, error)
-	DeleteTodoAttachmentFn            func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) error
+	CreateTodoFn                          func(ctx context.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error)
+	GetTodoByIDFn                         func(ctx context.Context, userID string, todoID uuid.UUID) (*todo.PopulatedTodo, error)
+	CheckTodoExistsFn                     func(ctx context.Context, userID string, todoID uuid.UUID) (*todo.Todo, error)
+	GetTodosFn                            func(ctx context.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
+	UpdateTodoFn                          func(ctx context.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
+	DeleteTodoFn                          func(ctx context.Context, userID string, todoID uuid.UUID) error
+	GetTodoStatsFn                        func(ctx context.Context, userID string) (*todo.TodoStats, error)
+	GetTodoAttachmentFn                   func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) (*todo.TodoAttachment, error)
+	GetTodoAttachmentsFn                  func(ctx context.Context, todoID uuid.UUID) ([]todo.TodoAttachment, error)
+	DeleteTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentKeysForTodoAndSubtasksFn func(ctx context.Context, userID string, todoID uuid.UUID) ([]string, error)
-	UploadTodoAttachmentFn            func(ctx context.Context, todoID uuid.UUID, userID string, s3Key string, fileName string, fileSize int64, mimeType string) (*todo.TodoAttachment, error)
+	UploadTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, userID string, s3Key string, fileName string, fileSize int64, mimeType string) (*todo.TodoAttachment, error)
 }
 
 var _ repository.TodoRepositoryInterface = (*FakeTodoRepository)(nil)
@@ -227,11 +227,11 @@ func (f *FakeCategoryRepository) DeleteCategory(ctx context.Context, userID stri
 // ---------------------------------------------------------------------------
 
 type FakeCommentRepository struct {
-	AddCommentFn         func(ctx context.Context, userID string, todoID uuid.UUID, payload *comment.AddCommentPayload) (*comment.Comment, error)
+	AddCommentFn          func(ctx context.Context, userID string, todoID uuid.UUID, payload *comment.AddCommentPayload) (*comment.Comment, error)
 	GetCommentsByTodoIDFn func(ctx context.Context, userID string, todoID uuid.UUID) ([]comment.Comment, error)
-	GetCommentByIDFn     func(ctx context.Context, userID string, commentID uuid.UUID) (*comment.Comment, error)
-	UpdateCommentFn      func(ctx context.Context, userID string, commentID uuid.UUID, content string) (*comment.Comment, error)
-	DeleteCommentFn      func(ctx context.Context, userID string, commentID uuid.UUID) error
+	GetCommentByIDFn      func(ctx context.Context, userID string, commentID uuid.UUID) (*comment.Comment, error)
+	UpdateCommentFn       func(ctx context.Context, userID string, commentID uuid.UUID, content string) (*comment.Comment, error)
+	DeleteCommentFn       func(ctx context.Context, userID string, commentID uuid.UUID) error
 }
 
 var _ repository.CommentRepositoryInterface = (*FakeCommentRepository)(nil)

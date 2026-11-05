@@ -21,7 +21,10 @@ func NewRouter(s *server.Server, h *handler.Handlers, services *service.Services
 	router.HTTPErrorHandler = middlewares.Global.GlobalErrorHandler
 
 	// global middlewares
+	// NOTE: Recover must be first-registered (= outermost in Echo) so it
+	// catches panics from every middleware below it and all handlers.
 	router.Use(
+		middlewares.Global.Recover(),
 		echoMiddleware.RateLimiterWithConfig(echoMiddleware.RateLimiterConfig{
 			Store: echoMiddleware.NewRateLimiterMemoryStore(rate.Limit(20)),
 			DenyHandler: func(c echo.Context, identifier string, err error) error {
@@ -48,7 +51,6 @@ func NewRouter(s *server.Server, h *handler.Handlers, services *service.Services
 		middlewares.Tracing.EnhanceTracing(),
 		middlewares.ContextEnhancer.EnhanceContext(),
 		middlewares.Global.RequestLogger(),
-		middlewares.Global.Recover(),
 	)
 
 	// register system routes

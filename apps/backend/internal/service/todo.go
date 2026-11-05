@@ -235,7 +235,9 @@ type s3ObjectDeleter interface {
 // deleteS3ObjectWithRetry deletes one S3 object, retrying transient
 // failures with exponential backoff. It reports how many attempts ran so
 // callers can log escalation context on final failure.
-func deleteS3ObjectWithRetry(ctx context.Context, deleter s3ObjectDeleter, bucket, key string) (attempts int, err error) {
+func deleteS3ObjectWithRetry(ctx context.Context, deleter s3ObjectDeleter, bucket, key string) (int, error) {
+	attempts := 0
+	var err error
 	for attempt := 1; attempt <= s3DeleteMaxAttempts; attempt++ {
 		attempts = attempt
 		if err = deleter.DeleteObject(ctx, bucket, key); err == nil {

@@ -4,8 +4,11 @@ import (
 	"context"
 	"errors"
 	"mime/multipart"
+	"net/http"
 	"testing"
 
+	"github.com/faizan1250/taskify/internal/errs"
+	"github.com/faizan1250/taskify/internal/lib/aws"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/category"
 	"github.com/faizan1250/taskify/internal/model/todo"
@@ -510,5 +513,70 @@ func TestTodoService_AttachmentPreconditions(t *testing.T) {
 		_, err := svc.GetAttachmentPresignedURL(newEchoCtx(), "user-1", todoID, attachmentID)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "repo boom")
+	})
+}
+
+func TestTodoService_AttachmentS3Unavailable(t *testing.T) {
+	todoID := uuid.New()
+	attachmentID := uuid.New()
+
+	attachmentRepo := func() *FakeTodoRepository {
+		tr := &FakeTodoRepository{}
+		tr.CheckTodoExistsFn = func(_ context.Context, _ string, _ uuid.UUID) (*todo.Todo, error) {
+			return &todo.Todo{}, nil
+		}
+		tr.GetTodoAttachmentFn = func(_ context.Context, _ uuid.UUID, _ uuid.UUID) (*todo.TodoAttachment, error) {
+			return &todo.TodoAttachment{}, nil
+		}
+		tr.DeleteTodoAttachmentFn = func(_ context.Context, _ uuid.UUID, _ uuid.UUID) error {
+			return nil
+		}
+		return tr
+	}
+
+	assertServiceUnavailable := func(t *testing.T, err error) {
+		t.Helper()
+		require.Error(t, err)
+		var httpErr *errs.HTTPError
+		require.True(t, errors.As(err, &httpErr))
+		assert.Equal(t, http.StatusServiceUnavailable, httpErr.Status)
+	}
+
+	t.Run("UploadTodoAttachment returns 503 when awsClient is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, nil)
+		_, err := svc.UploadTodoAttachment(newEchoCtx(), "user-1", todoID, validFileHeader(t))
+		assertServiceUnavailable(t, err)
+	})
+
+	t.Run("UploadTodoAttachment returns 503 when S3 client is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, &aws.AWS{S3: nil})
+		_, err := svc.UploadTodoAttachment(newEchoCtx(), "user-1", todoID, validFileHeader(t))
+		assertServiceUnavailable(t, err)
+	})
+
+	t.Run("GetAttachmentPresignedURL returns 503 when awsClient is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, nil)
+		_, err := svc.GetAttachmentPresignedURL(newEchoCtx(), "user-1", todoID, attachmentID)
+		assertServiceUnavailable(t, err)
+	})
+
+	t.Run("GetAttachmentPresignedURL returns 503 when S3 client is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, &aws.AWS{S3: nil})
+		_, err := svc.GetAttachmentPresignedURL(newEchoCtx(), "user-1", todoID, attachmentID)
+		assertServiceUnavailable(t, err)
+	})
+
+	t.Run("DeleteTodoAttachment skips S3 when awsClient is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, nil)
+		assert.NotPanics(t, func() {
+			assert.NoError(t, svc.DeleteTodoAttachment(newEchoCtx(), "user-1", todoID, attachmentID))
+		})
+	})
+
+	t.Run("DeleteTodoAttachment skips S3 when S3 client is nil", func(t *testing.T) {
+		svc := service.NewTodoService(nil, attachmentRepo(), &FakeCategoryRepository{}, &aws.AWS{S3: nil})
+		assert.NotPanics(t, func() {
+			assert.NoError(t, svc.DeleteTodoAttachment(newEchoCtx(), "user-1", todoID, attachmentID))
+		})
 	})
 }

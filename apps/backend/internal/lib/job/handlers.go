@@ -25,6 +25,10 @@ func (j *JobService) handleWelcomeEmailTask(ctx context.Context, t *asynq.Task) 
 		return fmt.Errorf("failed to unmarshal welcome email payload: %w", err)
 	}
 
+	if j.emailClient == nil {
+		return errors.New("email client is not configured")
+	}
+
 	j.logger.Info().
 		Str("type", "welcome").
 		Str("to", p.To).
@@ -92,6 +96,10 @@ func (j *JobService) handleReminderEmailTask(ctx context.Context, t *asynq.Task)
 		}
 	}
 
+	if j.authService == nil {
+		return errors.New("auth service is not configured")
+	}
+
 	userEmail, err := j.authService.GetUserEmail(ctx, p.UserID)
 	if err != nil {
 		j.logger.Error().
@@ -100,6 +108,10 @@ func (j *JobService) handleReminderEmailTask(ctx context.Context, t *asynq.Task)
 			Err(err).
 			Msg("Failed to resolve user email")
 		return fmt.Errorf("failed to resolve user email for user %s: %w", p.UserID, err)
+	}
+
+	if j.emailClient == nil {
+		return errors.New("email client is not configured")
 	}
 
 	switch p.TaskType {
@@ -175,6 +187,10 @@ func (j *JobService) handleWeeklyReportEmailTask(ctx context.Context, t *asynq.T
 		Int("overdue_count", p.OverdueCount).
 		Msg("Processing weekly report email task")
 
+	if j.authService == nil {
+		return errors.New("auth service is not configured")
+	}
+
 	userEmail, err := j.authService.GetUserEmail(ctx, p.UserID)
 	if err != nil {
 		j.logger.Error().
@@ -183,6 +199,10 @@ func (j *JobService) handleWeeklyReportEmailTask(ctx context.Context, t *asynq.T
 			Err(err).
 			Msg("Failed to resolve user email")
 		return fmt.Errorf("failed to resolve user email for user %s: %w", p.UserID, err)
+	}
+
+	if j.emailClient == nil {
+		return errors.New("email client is not configured")
 	}
 
 	err = j.emailClient.SendWeeklyReportEmail(

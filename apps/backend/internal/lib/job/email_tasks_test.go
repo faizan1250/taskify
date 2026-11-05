@@ -202,3 +202,88 @@ func TestHandleReminderEmailTask_FreshnessGuard(t *testing.T) {
 		})
 	}
 }
+
+func TestHandleReminderEmailTask_NilDependencies(t *testing.T) {
+	logger := zerolog.Nop()
+	todoID := uuid.New()
+
+	newReminderTask := func() *asynq.Task {
+		payload, err := json.Marshal(job.ReminderEmailTask{
+			UserID:    "user-123",
+			TodoID:    todoID,
+			TodoTitle: "Test task",
+			TaskType:  "due_date_reminder",
+			DueDate:   time.Now().Add(24 * time.Hour),
+		})
+		require.NoError(t, err)
+		return asynq.NewTask(job.TaskReminderEmail, payload)
+	}
+
+	t.Run("missing auth service returns error", func(t *testing.T) {
+		svc := &job.JobService{}
+		svc.SetLogger(&logger)
+
+		err := svc.HandleReminderEmailTask(context.Background(), newReminderTask())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "auth service is not configured")
+	})
+
+	t.Run("missing email client returns error", func(t *testing.T) {
+		svc := &job.JobService{}
+		svc.SetLogger(&logger)
+		svc.SetAuthService(&mockAuthService{email: "user@example.com"})
+
+		err := svc.HandleReminderEmailTask(context.Background(), newReminderTask())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "email client is not configured")
+	})
+}
+
+func TestHandleWelcomeEmailTask_NilEmailClient(t *testing.T) {
+	logger := zerolog.Nop()
+	svc := &job.JobService{}
+	svc.SetLogger(&logger)
+
+	payload, err := json.Marshal(map[string]string{
+		"to":         "user@example.com",
+		"first_name": "Test",
+	})
+	require.NoError(t, err)
+
+	err = svc.HandleWelcomeEmailTask(context.Background(), asynq.NewTask(job.TaskWelcome, payload))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "email client is not configured")
+}
+
+func TestHandleWeeklyReportEmailTask_NilDependencies(t *testing.T) {
+	logger := zerolog.Nop()
+
+	newReportTask := func() *asynq.Task {
+		payload, err := json.Marshal(job.WeeklyReportEmailTask{
+			UserID:    "user-123",
+			WeekStart: time.Now().Add(-7 * 24 * time.Hour),
+			WeekEnd:   time.Now(),
+		})
+		require.NoError(t, err)
+		return asynq.NewTask(job.TaskWeeklyReportEmail, payload)
+	}
+
+	t.Run("missing auth service returns error", func(t *testing.T) {
+		svc := &job.JobService{}
+		svc.SetLogger(&logger)
+
+		err := svc.HandleWeeklyReportEmailTask(context.Background(), newReportTask())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "auth service is not configured")
+	})
+
+	t.Run("missing email client returns error", func(t *testing.T) {
+		svc := &job.JobService{}
+		svc.SetLogger(&logger)
+		svc.SetAuthService(&mockAuthService{email: "user@example.com"})
+
+		err := svc.HandleWeeklyReportEmailTask(context.Background(), newReportTask())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "email client is not configured")
+	})
+}

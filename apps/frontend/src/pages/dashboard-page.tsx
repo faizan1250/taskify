@@ -103,7 +103,7 @@ export function DashboardPage() {
       color: "text-red-600 dark:text-red-400",
       bgColor:
         "border border-red-500/30 bg-gradient-to-b from-red-500/15 to-red-500/5",
-      to: "/todos?overdue=true",
+      to: "/todos?overdue=true&sort=due_date&order=asc",
       filterLabel: "View overdue tasks",
     },
     {
@@ -118,7 +118,8 @@ export function DashboardPage() {
     },
   ];
 
-  const weekHref = `/todos?dueFrom=${weekRange.dueFrom}&dueTo=${weekRange.dueTo}`;
+  const weekHref = `/todos?dueFrom=${weekRange.dueFrom}&dueTo=${weekRange.dueTo}&sort=due_date&order=asc`;
+  const overdueHref = "/todos?overdue=true&sort=due_date&order=asc";
 
   return (
     <div className="dash-scope space-y-6">
@@ -199,7 +200,7 @@ export function DashboardPage() {
                 </span>
               )}
             </CardTitle>
-            <Link to="/todos?overdue=true">
+            <Link to={overdueHref}>
               <Button variant="ghost" size="sm" className="dash-focusable">
                 View All
                 <ChevronRight className="h-4 w-4 ml-1" aria-hidden="true" />

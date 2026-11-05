@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { formatDistanceToNow } from "date-fns";
 import { useUser } from "@clerk/clerk-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ErrorBoundary } from "@/components/error-boundary";
 import {
@@ -64,6 +66,21 @@ interface Comment {
   userId: string;
   createdAt: string;
   updatedAt: string;
+}
+
+function formatRelativeTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  try {
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch {
+    return date.toLocaleString();
+  }
+}
+
+function initialsFor(userId: string): string {
+  const clean = userId.replace(/^optimistic-/, "");
+  return (clean.charAt(0) || "?").toUpperCase();
 }
 
 /**
@@ -172,17 +189,40 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                   ))}
                 </div>
               ) : comments?.length ? (
-                comments.map((comment) => (
-                  <Card key={comment.id}>
+                comments.map((comment) => {
+                  const isOptimistic = comment.id.startsWith("optimistic-");
+                  const isOwn = comment.userId === user?.id;
+                  return (
+                  <Card key={comment.id} className={isOptimistic ? "opacity-70" : undefined} aria-busy={isOptimistic || undefined}>
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary">You</Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {comment.createdAt !== comment.updatedAt &&
-                                "edited • "}
-                              {new Date(comment.createdAt).toLocaleString()}
+                          <div className="flex items-center gap-2 min-w-0">
+                            {isOwn && user ? (
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={user.imageUrl} alt="" />
+                                <AvatarFallback className="text-[10px]">
+                                  {initialsFor(user.id)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <Avatar className="h-6 w-6" aria-hidden="true">
+                                <AvatarFallback className="text-[10px]">
+                                  {initialsFor(comment.userId)}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                            {isOwn && <Badge variant="secondary">You</Badge>}
+                            <span
+                              className="text-xs text-muted-foreground truncate"
+                              title={new Date(comment.createdAt).toLocaleString()}
+                            >
+                              {isOptimistic
+                                ? "Sending…"
+                                : <>
+                                    {formatRelativeTime(comment.createdAt)}
+                                    {comment.createdAt !== comment.updatedAt && " • edited"}
+                                  </>}
                             </span>
                           </div>
 
@@ -224,6 +264,15 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                                         rows={3}
                                         {...field}
                                         disabled={updateComment.isPending}
+                                        onKeyDown={(e) => {
+                                          if (
+                                            (e.metaKey || e.ctrlKey) &&
+                                            e.key === "Enter"
+                                          ) {
+                                            e.preventDefault();
+                                            void editForm.handleSubmit(onEditSubmit)();
+                                          }
+                                        }}
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -256,7 +305,8 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                       </div>
                     </CardContent>
                   </Card>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -278,17 +328,33 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                     <FormItem>
                       <FormControl>
                         <Textarea
-                          placeholder="Add a comment..."
+                          placeholder="Add a comment… (⌘/Ctrl+Enter to send)"
                           rows={3}
                           {...field}
                           disabled={addComment.isPending}
+                          onKeyDown={(e) => {
+                            if (
+                              (e.metaKey || e.ctrlKey) &&
+                              e.key === "Enter"
+                            ) {
+                              e.preventDefault();
+                              void form.handleSubmit(onSubmit)();
+                            }
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="flex justify-end">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Press{" "}
+                    <kbd className="rounded border bg-muted px-1 font-sans text-[10px]">
+                      ⌘/Ctrl+Enter
+                    </kbd>{" "}
+                    to send
+                  </p>
                   <Button type="submit" disabled={addComment.isPending}>
                     <Send className="h-4 w-4 mr-2" />
                     {addComment.isPending ? "Adding..." : "Add Comment"}

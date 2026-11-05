@@ -42,20 +42,23 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn, formatFileSize } from "@/lib/utils";
 import {
   Archive,
   Calendar,
   CheckCircle2,
   Circle,
   Clock,
+  FileText,
   FileWarning,
   ListTree,
   Loader2,
   MessageSquare,
   Paperclip,
   Plus,
+  RotateCcw,
   Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -709,29 +712,70 @@ function SubtasksTab({ todo }: { todo: TGetTodoByIdResponse }) {
 function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
   const uploadAttachment = useUploadTodoAttachment();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadKey = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploads, setUploads] = useState<
+    { key: number; file: File; status: "uploading" | "error" }[]
+  >([]);
+  const busy = uploads.some((u) => u.status === "uploading");
+
+  const uploadOne = async (key: number, file: File) => {
+    setUploads((prev) =>
+      prev.map((u) => (u.key === key ? { ...u, status: "uploading" as const } : u)),
+    );
+    try {
+      await uploadAttachment.mutateAsync({ todoId: todo.id, file });
+      setUploads((prev) => prev.filter((u) => u.key !== key));
+      toast.success(`${file.name} uploaded`);
+    } catch {
+      setUploads((prev) =>
+        prev.map((u) => (u.key === key ? { ...u, status: "error" as const } : u)),
+      );
+      toast.error(`Failed to upload ${file.name}`);
+    }
+  };
+
+  const handleFiles = (files: File[]) => {
+    for (const file of files) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        toast.error(`File ${file.name} is too large (max 10MB)`);
+        continue;
+      }
+      const key = ++uploadKey.current;
+      setUploads((prev) => [...prev, { key, file, status: "uploading" }]);
+      void uploadOne(key, file);
+    }
+  };
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const files = Array.from(event.target.files ?? []);
     if (fileInputRef.current) fileInputRef.current.value = "";
-    for (const file of files) {
-      if (file.size > MAX_ATTACHMENT_BYTES) {
-        toast.error(`File ${file.name} is too large (max 10MB)`);
-        continue;
-      }
-      try {
-        await uploadAttachment.mutateAsync({ todoId: todo.id, file });
-        toast.success(`${file.name} uploaded`);
-      } catch {
-        toast.error(`Failed to upload ${file.name}`);
-      }
-    }
+    handleFiles(files);
   };
 
   return (
     <div className="space-y-4 p-4">
-      <div>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          handleFiles(Array.from(e.dataTransfer.files ?? []));
+        }}
+        className={cn(
+          "rounded-lg border border-dashed p-3 transition-colors",
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-muted-foreground/25",
+        )}
+        aria-label="Upload attachments dropzone"
+      >
         <input
           ref={fileInputRef}
           type="file"
@@ -739,30 +783,83 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
           className="hidden"
           aria-label="Upload attachments"
           onChange={(e) => void handleFileSelect(e)}
-          disabled={uploadAttachment.isPending}
+          disabled={busy}
         />
         <Button
           type="button"
           variant="outline"
           className="w-full border-dashed"
           onClick={() => fileInputRef.current?.click()}
-          disabled={uploadAttachment.isPending}
+          disabled={busy}
         >
-          {uploadAttachment.isPending ? (
+          {busy ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
             <Upload className="h-4 w-4 mr-2" />
           )}
-          {uploadAttachment.isPending ? "Uploading…" : "Upload files"}
+          {busy ? "Uploading…" : "Upload files"}
         </Button>
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Max 10MB per file.
+          Max 10MB per file. Drag &amp; drop here or browse.
         </p>
       </div>
+      {uploads.length > 0 && (
+        <ul className="space-y-2" aria-label="Upload progress">
+          {uploads.map((u) => (
+            <li
+              key={u.key}
+              className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg"
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                {u.status === "uploading" ? (
+                  <Loader2 className="h-5 w-5 text-muted-foreground flex-shrink-0 animate-spin" />
+                ) : (
+                  <FileText className="h-5 w-5 text-destructive flex-shrink-0" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate" title={u.file.name}>
+                    {u.file.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {u.status === "uploading"
+                      ? `Uploading… • ${formatFileSize(u.file.size)}`
+                      : `Upload failed • ${formatFileSize(u.file.size)}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {u.status === "error" && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void uploadOne(u.key, u.file)}
+                    aria-label={`Retry upload ${u.file.name}`}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setUploads((prev) => prev.filter((x) => x.key !== u.key))
+                  }
+                  disabled={u.status === "uploading"}
+                  aria-label={`Dismiss ${u.file.name}`}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <TodoAttachments
         todoId={todo.id}
         attachments={todo.attachments ?? []}
-        disabled={uploadAttachment.isPending}
+        disabled={busy}
       />
     </div>
   );

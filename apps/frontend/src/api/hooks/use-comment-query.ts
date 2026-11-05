@@ -120,7 +120,38 @@ export const useAddComment = () => {
   return useMutation({
     mutationFn: ({ body }: { body: TAddCommentPayload & { todoId: string } }) =>
       addComment({ api, todoId: body.todoId, data: body }),
-    onSuccess: (_, { body }) => {
+    onMutate: async ({ body }) => {
+      const queryKey = [
+        QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID,
+        body.todoId,
+      ] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<TGetCommentsByTodoIdResponse>(queryKey);
+      const now = new Date().toISOString();
+      const optimisticComment: TAddCommentResponse = {
+        id: `optimistic-${Date.now()}`,
+        todoId: body.todoId,
+        userId: "optimistic",
+        content: body.content,
+        createdAt: now,
+        updatedAt: now,
+      };
+      queryClient.setQueryData<TGetCommentsByTodoIdResponse>(queryKey, [
+        ...(previous ?? []),
+        optimisticComment,
+      ]);
+      return { previous, todoId: body.todoId };
+    },
+    onError: (err, _vars, context) => {
+      if (context) {
+        queryClient.setQueryData(
+          [QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID, context.todoId],
+          context.previous,
+        );
+      }
+      showApiErrorToast(err, "Failed to add comment");
+    },
+    onSettled: (_data, _err, { body }) => {
       queryClient.invalidateQueries({
         queryKey: [QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID, body.todoId],
       });
@@ -131,9 +162,6 @@ export const useAddComment = () => {
       queryClient.invalidateQueries({
         queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
       });
-    },
-    onError: (err) => {
-      showApiErrorToast(err, "Failed to add comment");
     },
   });
 };

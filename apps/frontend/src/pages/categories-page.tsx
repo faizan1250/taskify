@@ -56,12 +56,8 @@ export function CategoriesPage() {
   const deleteCategory = useDeleteCategory();
 
   const handleDeleteCategory = async (categoryId: string, categoryName: string) => {
-    try {
-      await deleteCategory.mutateAsync({ categoryId });
-      toast.success(`Category "${categoryName}" deleted successfully`);
-    } catch {
-      toast.error("Failed to delete category");
-    }
+    await deleteCategory.mutateAsync({ categoryId });
+    toast.success(`Category "${categoryName}" deleted successfully`);
   };
 
   return (

@@ -6,6 +6,7 @@ import { PublicRoute } from "@/components/public-route";
 import { CategoriesPage } from "@/pages/categories-page";
 import { DashboardPage } from "@/pages/dashboard-page";
 import { LandingPage } from "@/pages/landing-page";
+import { NotFoundPage } from "@/pages/not-found-page";
 import { SettingsPage } from "@/pages/settings-page";
 import { TodosPage } from "@/pages/todos-page";
 import {
@@ -72,6 +73,7 @@ const routes = createRoutesFromElements(
         </ProtectedRoute>
       }
     />
+    <Route path="*" element={<NotFoundPage />} />
   </>,
 );
 

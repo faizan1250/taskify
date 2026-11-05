@@ -1,8 +1,19 @@
+import { useState } from "react";
 import type { TGetTodoByIdResponse } from "@/api/hooks";
 import {
   useDeleteTodoAttachment,
   useGetTodoAttachmentPresignedUrl,
 } from "@/api/hooks/use-todo-attachment-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { formatFileSize } from "@/lib/utils";
 import { Download, FileText, Trash2 } from "lucide-react";
@@ -14,6 +25,11 @@ interface TodoAttachmentsProps {
   disabled?: boolean;
 }
 
+type PendingDelete = {
+  id: string;
+  name: string;
+} | null;
+
 export function TodoAttachments({
   todoId,
   attachments,
@@ -21,6 +37,7 @@ export function TodoAttachments({
 }: TodoAttachmentsProps) {
   const deleteAttachment = useDeleteTodoAttachment();
   const getPresignedUrl = useGetTodoAttachmentPresignedUrl();
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
   const handleDownload = async (
     attachment: TGetTodoByIdResponse["attachments"][number],
@@ -38,81 +55,118 @@ export function TodoAttachments({
     }
   };
 
-  const handleDelete = async (attachmentId: string, attachmentName: string) => {
-    if (!confirm(`Are you sure you want to delete "${attachmentName}"?`)) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
+    if (!pendingDelete) return;
 
     try {
       await deleteAttachment.mutateAsync({
         todoId,
-        attachmentId,
+        attachmentId: pendingDelete.id,
       });
       toast.success("Attachment deleted successfully");
+      setPendingDelete(null);
     } catch (error) {
       console.error("Failed to delete attachment:", error);
     }
   };
 
   if (attachments.length === 0) {
-    return null;
+    return (
+      <p className="text-sm text-muted-foreground">
+        No attachments yet. Uploaded files will appear here.
+      </p>
+    );
   }
 
   return (
-    <div className="space-y-2">
-      <h4 className="text-sm font-medium">
-        Current Attachments ({attachments.length})
-      </h4>
-      <div className="space-y-2 max-h-48 overflow-y-auto">
-        {attachments.map((attachment) => (
-          <div
-            key={attachment.id}
-            className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <p
-                  className="text-sm font-medium truncate"
-                  title={attachment.name}
+    <>
+      <div className="space-y-2">
+        <h4 className="text-sm font-medium">
+          Current Attachments ({attachments.length})
+        </h4>
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+            >
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="text-sm font-medium truncate"
+                    title={attachment.name}
+                  >
+                    {attachment.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {attachment.fileSize
+                      ? formatFileSize(attachment.fileSize)
+                      : "Unknown size"}
+                    {attachment.mimeType &&
+                      ` • ${attachment.mimeType.split("/")[1].toUpperCase()}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDownload(attachment)}
+                  disabled={disabled || getPresignedUrl.isPending}
+                  title="Download attachment"
                 >
-                  {attachment.name}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {attachment.fileSize
-                    ? formatFileSize(attachment.fileSize)
-                    : "Unknown size"}
-                  {attachment.mimeType &&
-                    ` • ${attachment.mimeType.split("/")[1].toUpperCase()}`}
-                </p>
+                  <Download className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    setPendingDelete({
+                      id: attachment.id,
+                      name: attachment.name,
+                    })
+                  }
+                  disabled={disabled || deleteAttachment.isPending}
+                  className="text-destructive hover:text-destructive"
+                  title="Delete attachment"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDownload(attachment)}
-                disabled={disabled || getPresignedUrl.isPending}
-                title="Download attachment"
-              >
-                <Download className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(attachment.id, attachment.name)}
-                disabled={disabled || deleteAttachment.isPending}
-                className="text-destructive hover:text-destructive"
-                title="Delete attachment"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
-    </div>
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Attachment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete &quot;{pendingDelete?.name}&quot;?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteAttachment.isPending}
+            >
+              {deleteAttachment.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

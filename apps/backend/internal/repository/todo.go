@@ -779,17 +779,16 @@ func (r *TodoRepository) ArchiveTodos(ctx context.Context, todoIDs []uuid.UUID) 
 			id = ANY(@todo_ids::uuid[])
 	`
 
-	result, err := r.server.DB.Pool.Exec(ctx, stmt, pgx.NamedArgs{
+	_, err := r.server.DB.Pool.Exec(ctx, stmt, pgx.NamedArgs{
 		"todo_ids": todoIDs,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to archive todos: %w", err)
 	}
 
-	if result.RowsAffected() != int64(len(todoIDs)) {
-		return fmt.Errorf("expected to archive %d todos, but archived %d", len(todoIDs), result.RowsAffected())
-	}
-
+	// Partial matches (already-archived, concurrently deleted, or foreign IDs)
+	// are success: the UPDATE archives every row that exists, so a short count
+	// must not fail the whole batch or retries could never converge.
 	return nil
 }
 

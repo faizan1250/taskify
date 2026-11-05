@@ -443,6 +443,45 @@ func TestTodoRepository_DeleteTodo(t *testing.T) {
 	})
 }
 
+func TestTodoRepository_ArchiveTodos_Idempotent(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+
+	userID := uuid.New().String()
+	first := createTestTodo(t, ctx, todoRepo, userID)
+	second := createTestTodo(t, ctx, todoRepo, userID)
+
+	t.Run("archives existing todos", func(t *testing.T) {
+		err := todoRepo.ArchiveTodos(ctx, []uuid.UUID{first.ID, second.ID})
+		require.NoError(t, err)
+
+		archived, err := todoRepo.GetTodoByID(ctx, userID, first.ID)
+		require.NoError(t, err)
+		require.NotNil(t, archived)
+		assert.Equal(t, todo.StatusArchived, archived.Status)
+	})
+
+	t.Run("partial batch with missing ID succeeds", func(t *testing.T) {
+		third := createTestTodo(t, ctx, todoRepo, userID)
+
+		err := todoRepo.ArchiveTodos(ctx, []uuid.UUID{third.ID, uuid.New()})
+		require.NoError(t, err)
+
+		archived, err := todoRepo.GetTodoByID(ctx, userID, third.ID)
+		require.NoError(t, err)
+		require.NotNil(t, archived)
+		assert.Equal(t, todo.StatusArchived, archived.Status)
+	})
+
+	t.Run("re-archiving is a no-op success", func(t *testing.T) {
+		err := todoRepo.ArchiveTodos(ctx, []uuid.UUID{first.ID, second.ID})
+		require.NoError(t, err)
+	})
+}
+
 func TestTodoRepository_DeleteTodo_CascadeSubtasks(t *testing.T) {
 	_, testServer, cleanup := testing_pkg.SetupTest(t)
 	defer cleanup()

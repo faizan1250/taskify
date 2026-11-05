@@ -47,11 +47,11 @@ type ReminderEmailTask struct {
 func GenerateReminderTaskID(task *ReminderEmailTask) string {
 	switch task.TaskType {
 	case "due_date_reminder":
-		return fmt.Sprintf("due_date_reminder:%s:%s", task.TodoID, task.DueDate.UTC().Format("2006-01-02"))
+		return fmt.Sprintf("due_date_reminder:%s:%s", task.TodoID, task.DueDate.UTC().Format(time.RFC3339))
 	case "overdue_notification":
-		return fmt.Sprintf("overdue_notification:%s:%s", task.TodoID, time.Now().UTC().Format("2006-01-02"))
+		return fmt.Sprintf("overdue_notification:%s:%s", task.TodoID, task.DueDate.UTC().Format(time.RFC3339))
 	default:
-		return fmt.Sprintf("%s:%s:%s", task.TaskType, task.TodoID, time.Now().UTC().Format("2006-01-02"))
+		return fmt.Sprintf("%s:%s:%s", task.TaskType, task.TodoID, time.Now().UTC().Format(time.RFC3339))
 	}
 }
 

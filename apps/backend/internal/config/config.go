@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 
@@ -202,12 +203,12 @@ func LoadConfig() (*Config, error) {
 		return strings.ToLower(strings.TrimPrefix(key, "TASKIFY_")), value
 	}), nil)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("could not load initial env variables")
+		return nil, fmt.Errorf("could not load initial env variables: %w", err)
 	}
 
 	for key, value := range envVars {
 		if err := k.Set(key, value); err != nil {
-			logger.Fatal().Err(err).Str("key", key).Msg("could not set config key")
+			return nil, fmt.Errorf("could not set config key %q: %w", key, err)
 		}
 	}
 
@@ -215,7 +216,7 @@ func LoadConfig() (*Config, error) {
 
 	err = k.Unmarshal("", mainConfig)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("could not unmarshal main config")
+		return nil, fmt.Errorf("could not unmarshal main config: %w", err)
 	}
 
 	if mainConfig.Observability == nil {
@@ -252,7 +253,7 @@ func LoadConfig() (*Config, error) {
 	mainConfig.Observability.Environment = mainConfig.Primary.Env
 
 	if err := mainConfig.Observability.Validate(); err != nil {
-		logger.Fatal().Err(err).Msg("invalid observability config")
+		return nil, fmt.Errorf("invalid observability config: %w", err)
 	}
 
 	if mainConfig.Cron == nil {
@@ -265,10 +266,9 @@ func LoadConfig() (*Config, error) {
 
 	err = validate.Struct(mainConfig)
 	if err != nil {
-		logger.Fatal().Err(err).Msg("config validation failed")
-	} else {
-		logger.Info().Msg("config validation passed")
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
+	logger.Info().Msg("config validation passed")
 
 	return mainConfig, nil
 }

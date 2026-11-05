@@ -285,20 +285,16 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 		return nil, fmt.Errorf("failed to get total count for todos user_id=%s: %w", userID, err)
 	}
 
-	if query.Sort != nil {
-		stmt += " ORDER BY t." + *query.Sort
-		if query.Order != nil && *query.Order == "desc" {
-			stmt += " DESC"
-		} else {
-			stmt += " ASC"
-		}
-	} else {
-		stmt += " ORDER BY t.created_at DESC"
-	}
+	page := normalizePage(query.Page)
+	limit := normalizeLimit(query.Limit, 20)
+
+	sortColumn := resolveSortColumn(query.Sort, allowedTodoSortColumns, "t.created_at")
+	sortOrder := resolveSortOrder(query.Order, "DESC")
+	stmt += " ORDER BY " + sortColumn + " " + sortOrder
 
 	stmt += " LIMIT @limit OFFSET @offset"
-	args["limit"] = *query.Limit
-	args["offset"] = (*query.Page - 1) * (*query.Limit)
+	args["limit"] = limit
+	args["offset"] = (page - 1) * limit
 
 	rows, err := r.server.DB.Pool.Query(ctx, stmt, args)
 	if err != nil {
@@ -310,8 +306,8 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &model.PaginatedResponse[todo.PopulatedTodo]{
 				Data:       []todo.PopulatedTodo{},
-				Page:       *query.Page,
-				Limit:      *query.Limit,
+				Page:       page,
+				Limit:      limit,
 				Total:      0,
 				TotalPages: 0,
 			}, nil
@@ -321,10 +317,10 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 
 	return &model.PaginatedResponse[todo.PopulatedTodo]{
 		Data:       todos,
-		Page:       *query.Page,
-		Limit:      *query.Limit,
+		Page:       page,
+		Limit:      limit,
 		Total:      total,
-		TotalPages: (total + *query.Limit - 1) / *query.Limit,
+		TotalPages: (total + limit - 1) / limit,
 	}, nil
 }
 

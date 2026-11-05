@@ -12,10 +12,10 @@ import (
 
 type CategoryService struct {
 	server       *server.Server
-	categoryRepo *repository.CategoryRepository
+	categoryRepo repository.CategoryRepositoryInterface
 }
 
-func NewCategoryService(server *server.Server, categoryRepo *repository.CategoryRepository) *CategoryService {
+func NewCategoryService(server *server.Server, categoryRepo repository.CategoryRepositoryInterface) *CategoryService {
 	return &CategoryService{
 		server:       server,
 		categoryRepo: categoryRepo,

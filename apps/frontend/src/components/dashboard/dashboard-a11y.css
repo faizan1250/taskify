@@ -1,0 +1,44 @@
+/* Dashboard + onboarding accessibility layer.
+   Scoped to `.dash-scope` so global components stay untouched. */
+
+/* Visible keyboard focus: 2px ring + offset on dashboard interactives.
+   WCAG 2.4.13 — indicator perimeter matches the control, 3:1 vs. adjacent. */
+.dash-scope .dash-focusable:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+/* Kebab focus-within: while any inner control of a lane row (kebab trigger,
+   title button, checkbox) holds focus, tint the row edge so keyboard users
+   can tell which card the open menu belongs to. */
+.dash-scope .dash-item {
+  border-radius: 7px;
+}
+.dash-scope .dash-item:focus-within {
+  border-color: var(--ring);
+}
+
+/* Screen-reader-only text (explicit local copy of the sr-only pattern). */
+.dash-scope .dash-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced motion: functional state changes survive, animation does not. */
+@media (prefers-reduced-motion: reduce) {
+  .dash-scope *,
+  .dash-scope *::before,
+  .dash-scope *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

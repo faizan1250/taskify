@@ -2,6 +2,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./components/ui/line-clamp.css";
+@import "./components/dashboard/dashboard-a11y.css";
 
 @custom-variant dark (&:is(.dark *));
 

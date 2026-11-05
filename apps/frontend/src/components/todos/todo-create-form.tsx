@@ -55,10 +55,26 @@ type CreateTodoForm = z.infer<typeof createTodoSchema>;
 
 interface TodoCreateFormProps {
   children: ReactNode;
+  /**
+   * Controlled open state for programmatic opening (e.g. the `C`
+   * hotkey). Omit for the default uncontrolled trigger behavior.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function TodoCreateForm({ children }: TodoCreateFormProps) {
-  const [open, setOpen] = useState(false);
+export function TodoCreateForm({
+  children,
+  open,
+  onOpenChange,
+}: TodoCreateFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = open !== undefined;
+  const dialogOpen = isControlled ? open : internalOpen;
+  const handleOpenChange = (next: boolean) => {
+    if (!isControlled) setInternalOpen(next);
+    onOpenChange?.(next);
+  };
   const [attachments, setAttachments] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createTodo = useCreateTodo();
@@ -132,14 +148,14 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
       toast.success("Task created successfully!");
       form.reset();
       setAttachments([]);
-      setOpen(false);
+      handleOpenChange(false);
     } catch {
       toast.error("Failed to create task");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
@@ -400,7 +416,7 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => handleOpenChange(false)}
                 disabled={createTodo.isPending}
               >
                 Cancel

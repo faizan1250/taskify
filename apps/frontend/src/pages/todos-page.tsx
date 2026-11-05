@@ -4,8 +4,10 @@ import {
   useGetTodoStats,
   type TGetTodosQuery,
 } from "@/api/hooks/use-todo-query";
+import { ShortcutHint } from "@/components/command-palette";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
+import { TodoEditForm } from "@/components/todos/todo-edit-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -28,8 +30,10 @@ import {
   type TodosSort,
   type TodosTab,
 } from "@/hooks/use-todos-search-params";
+import { useTodosHotkeys } from "@/hooks/use-todos-hotkeys";
+import { cn } from "@/lib/utils";
 import { Plus, Search, CheckSquare } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function TodosPage() {
   const {
@@ -60,6 +64,9 @@ export function TodosPage() {
   } = useTodosSearchParams();
 
   const [selectedTodos, setSelectedTodos] = useState<string[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const keyboardEditTriggerRef = useRef<HTMLButtonElement>(null);
 
   const dueRangeInvalid =
     dueFrom !== null && dueTo !== null && dueFrom > dueTo;
@@ -112,6 +119,37 @@ export function TodosPage() {
     archived: stats?.archived || 0,
   };
 
+  const visibleTodos = todos?.data ?? [];
+
+  const { activeIndex, setActiveIndex } = useTodosHotkeys({
+    enabled: !isLoading,
+    count: visibleTodos.length,
+    onOpenCreate: () => setCreateOpen(true),
+    onFocusSearch: () => searchRef.current?.focus(),
+    onToggleSelect: (index) => {
+      const target = visibleTodos[index];
+      if (target) {
+        handleSelectTodo(target.id, !selectedTodos.includes(target.id));
+      }
+    },
+    onEditActive: () => keyboardEditTriggerRef.current?.click(),
+    onClear: () => {
+      setSelectedTodos([]);
+      setActiveIndex(0);
+    },
+  });
+
+  const activeTodo = visibleTodos[activeIndex];
+  const activeId = activeTodo?.id;
+
+  // Keep the keyboard-active row in view (instant: no motion to reduce).
+  useEffect(() => {
+    if (!activeId) return;
+    document
+      .querySelector(`[data-todo-row="${activeId}"]`)
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeId]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -122,7 +160,7 @@ export function TodosPage() {
             Manage and organize your tasks
           </p>
         </div>
-        <TodoCreateForm>
+        <TodoCreateForm open={createOpen} onOpenChange={setCreateOpen}>
           <Button>
             <Plus className="h-4 w-4 mr-2" />
             New Task
@@ -141,6 +179,7 @@ export function TodosPage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search tasks..."
+                ref={searchRef}
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
@@ -351,8 +390,17 @@ export function TodosPage() {
                   </Card>
                 )}
 
-                {todos.data.map((todo) => (
-                  <div key={todo.id} className="flex items-start gap-3">
+                {todos.data.map((todo, index) => (
+                  <div
+                    key={todo.id}
+                    data-todo-row={todo.id}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={cn(
+                      "-m-1 flex items-start gap-3 rounded-[7px] p-1",
+                      index === activeIndex &&
+                        "ring-2 ring-primary ring-offset-2 ring-offset-background",
+                    )}
+                  >
                     <div className="pt-4">
                       <Checkbox
                         checked={selectedTodos.includes(todo.id)}
@@ -417,8 +465,46 @@ export function TodosPage() {
               </Card>
             )}
           </div>
+          {/* Keyboard hints */}
+          <div
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground"
+            aria-label="Task list keyboard shortcuts"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["C"]} /> New task
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["/"]} /> Search
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["J", "K"]} /> Move
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["X"]} /> Select
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["E"]} /> Edit
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <ShortcutHint keys={["Esc"]} /> Clear
+            </span>
+          </div>
         </TabsContent>
       </Tabs>
+
+      {/* Hidden trigger: the `E` hotkey opens the edit dialog for the
+          active task without touching the per-card dropdown menu. */}
+      {activeTodo && (
+        <TodoEditForm key={activeTodo.id} todo={activeTodo}>
+          <button
+            ref={keyboardEditTriggerRef}
+            type="button"
+            tabIndex={-1}
+            aria-hidden="true"
+            className="sr-only"
+          />
+        </TodoEditForm>
+      )}
     </div>
   );
 }

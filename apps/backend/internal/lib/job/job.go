@@ -26,6 +26,8 @@ type AuthServiceInterface interface {
 
 type TodoRepositoryInterface interface {
 	GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error)
+	MarkDueDateReminderSent(ctx context.Context, todoID uuid.UUID) error
+	MarkOverdueNotificationSent(ctx context.Context, todoID uuid.UUID) error
 }
 
 func NewJobService(logger *zerolog.Logger, cfg *config.Config) *JobService {

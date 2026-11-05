@@ -131,6 +131,28 @@ func (j *JobService) handleReminderEmailTask(ctx context.Context, t *asynq.Task)
 		return err
 	}
 
+	// Record the reminder as sent only after confirmed delivery. Marking at
+	// enqueue time (in the cron job) loses the reminder if the worker later
+	// fails: the flag is already set and the task ID dedupes re-enqueue.
+	if j.todoRepo != nil {
+		var markErr error
+		switch p.TaskType {
+		case "due_date_reminder":
+			markErr = j.todoRepo.MarkDueDateReminderSent(ctx, p.TodoID)
+		case "overdue_notification":
+			markErr = j.todoRepo.MarkOverdueNotificationSent(ctx, p.TodoID)
+		}
+		if markErr != nil {
+			j.logger.Error().
+				Str("type", p.TaskType).
+				Str("user_id", p.UserID).
+				Str("todo_id", p.TodoID.String()).
+				Err(markErr).
+				Msg("Failed to mark reminder email sent")
+			return fmt.Errorf("failed to mark reminder email sent for todo %s: %w", p.TodoID, markErr)
+		}
+	}
+
 	j.logger.Info().
 		Str("type", p.TaskType).
 		Str("user_id", p.UserID).

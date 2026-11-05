@@ -39,6 +39,20 @@ func NewTodoService(server *server.Server, todoRepo repository.TodoRepositoryInt
 	}
 }
 
+// s3Available reports whether attachment storage (AWS S3 client) is configured.
+func (s *TodoService) s3Available() bool {
+	return s != nil && s.awsClient != nil && s.awsClient.S3 != nil
+}
+
+// errS3Unavailable is returned when attachment storage is not configured.
+func errS3Unavailable() error {
+	return &errs.HTTPError{
+		Code:    errs.MakeUpperCaseWithUnderscores(http.StatusText(http.StatusServiceUnavailable)),
+		Message: "attachment storage is currently unavailable",
+		Status:  http.StatusServiceUnavailable,
+	}
+}
+
 func (s *TodoService) CreateTodo(ctx echo.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error) {
 	logger := middleware.GetLogger(ctx)
 
@@ -290,6 +304,13 @@ func (s *TodoService) UploadTodoAttachment(
 		return nil, err
 	}
 
+	// Fail fast when attachment storage is unconfigured instead of
+	// panicking on a nil S3 client.
+	if !s.s3Available() {
+		logger.Error().Msg("attachment upload rejected: S3 client is not configured")
+		return nil, errS3Unavailable()
+	}
+
 	// Open uploaded file
 	src, err := file.Open()
 	if err != nil {
@@ -345,7 +366,6 @@ func (s *TodoService) UploadTodoAttachment(
 		logger.Error().Err(err).Msg("failed to create attachment record")
 
 		reqCtx := ctx.Request().Context()
-		bucket := s.server.Config.AWS.UploadBucket
 		cleanupKey := s3Key
 
 		// Delete orphaned upload from S3 asynchronously using detached context
@@ -356,6 +376,12 @@ func (s *TodoService) UploadTodoAttachment(
 				}
 			}()
 
+			// Skip when storage is unconfigured instead of panicking on a nil S3 client.
+			if !s.s3Available() {
+				return
+			}
+
+			bucket := s.server.Config.AWS.UploadBucket
 			bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
 			defer cancel()
 
@@ -417,7 +443,6 @@ func (s *TodoService) DeleteTodoAttachment(
 
 	reqCtx := ctx.Request().Context()
 	downloadKey := attachment.DownloadKey
-	bucket := s.server.Config.AWS.UploadBucket
 
 	// Delete from S3 asynchronously
 	go func() {
@@ -427,6 +452,13 @@ func (s *TodoService) DeleteTodoAttachment(
 			}
 		}()
 
+		// Best-effort delete: skip when storage is unconfigured instead of
+		// panicking on a nil S3 client.
+		if !s.s3Available() {
+			return
+		}
+
+		bucket := s.server.Config.AWS.UploadBucket
 		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(reqCtx), 30*time.Second)
 		defer cancel()
 
@@ -472,6 +504,13 @@ func (s *TodoService) GetAttachmentPresignedURL(
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to get attachment details")
 		return "", err
+	}
+
+	// Fail fast when attachment storage is unconfigured instead of
+	// panicking on a nil S3 client.
+	if !s.s3Available() {
+		logger.Error().Msg("presigned URL generation rejected: S3 client is not configured")
+		return "", errS3Unavailable()
 	}
 
 	// Generate presigned URL

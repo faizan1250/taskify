@@ -1,5 +1,4 @@
 import { useGetAllCategories } from "@/api/hooks/use-category-query";
-import { useDebounce } from "@/api/hooks/use-debounce";
 import {
   useGetAllTodos,
   useGetTodoStats,
@@ -20,34 +19,48 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  useTodosSearchParams,
+  type TodosPriorityFilter,
+  type TodosSort,
+  type TodosTab,
+} from "@/hooks/use-todos-search-params";
 import { Plus, Search, CheckSquare } from "lucide-react";
 import { useState } from "react";
 
-type TodoStatus = "draft" | "active" | "completed" | "archived";
-type TodoPriority = "low" | "medium" | "high" | "all";
-
 export function TodosPage() {
-  const [activeTab, setActiveTab] = useState<TodoStatus | "all">("all");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedPriority, setSelectedPriority] = useState<TodoPriority>("all");
-  const [sortBy, setSortBy] = useState<TGetTodosQuery["sort"]>("updated_at");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [selectedTodos, setSelectedTodos] = useState<string[]>([]);
-  const [page, setPage] = useState(1);
+  const {
+    tab,
+    category,
+    priority,
+    sort,
+    order,
+    page,
+    sortValue,
+    searchInput,
+    setSearchInput,
+    debouncedSearch,
+    setTab,
+    setCategory,
+    setPriority,
+    setSortOrder,
+    setPage,
+    clearFilters,
+    hasActiveFilters,
+  } = useTodosSearchParams();
 
-  const debouncedSearch = useDebounce(searchQuery, 300);
+  const [selectedTodos, setSelectedTodos] = useState<string[]>([]);
 
   const { data: todos, isLoading } = useGetAllTodos({
     query: {
       page,
       limit: 20,
       search: debouncedSearch || undefined,
-      status: activeTab === "all" ? undefined : activeTab,
-      categoryId: selectedCategory === "all" ? undefined : selectedCategory,
-      priority: selectedPriority === "all" ? undefined : selectedPriority,
-      sort: sortBy,
-      order: sortOrder,
+      status: tab === "all" ? undefined : tab,
+      categoryId: category === "all" ? undefined : category,
+      priority: priority === "all" ? undefined : priority,
+      sort,
+      order,
     },
   });
 
@@ -71,15 +84,6 @@ export function TodosPage() {
     } else {
       setSelectedTodos([]);
     }
-  };
-
-  const clearFilters = () => {
-    setSearchQuery("");
-    setSelectedCategory("all");
-    setSelectedPriority("all");
-    setSortBy("updated_at");
-    setSortOrder("desc");
-    setPage(1);
   };
 
   const tabCounts = {
@@ -119,15 +123,14 @@ export function TodosPage() {
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search tasks..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                }}
                 className="pl-10"
               />
             </div>
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
+            <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="w-full sm:w-48">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
@@ -147,9 +150,9 @@ export function TodosPage() {
               </SelectContent>
             </Select>
             <Select
-              value={selectedPriority}
+              value={priority}
               onValueChange={(value) =>
-                setSelectedPriority(value as TodoPriority)
+                setPriority(value as TodosPriorityFilter)
               }
             >
               <SelectTrigger className="w-full sm:w-32">
@@ -163,11 +166,13 @@ export function TodosPage() {
               </SelectContent>
             </Select>
             <Select
-              value={`${sortBy}-${sortOrder}`}
+              value={sortValue}
               onValueChange={(value) => {
-                const [sort, order] = value.split("-");
-                setSortBy(sort as TGetTodosQuery["sort"]);
-                setSortOrder(order as "asc" | "desc");
+                const [nextSort, nextOrder] = value.split("-");
+                setSortOrder(
+                  nextSort as TodosSort,
+                  nextOrder as "asc" | "desc",
+                );
               }}
             >
               <SelectTrigger className="w-full sm:w-40">
@@ -191,8 +196,8 @@ export function TodosPage() {
 
       {/* Status Tabs */}
       <Tabs
-        value={activeTab}
-        onValueChange={(value) => setActiveTab(value as TodoStatus | "all")}
+        value={tab}
+        onValueChange={(value) => setTab(value as TodosTab | "all")}
       >
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
@@ -206,7 +211,7 @@ export function TodosPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="space-y-4">
+        <TabsContent value={tab} className="space-y-4">
           {/* Bulk Actions */}
           {selectedTodos.length > 0 && (
             <Card>
@@ -314,11 +319,11 @@ export function TodosPage() {
                   <CheckSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                   <h3 className="text-lg font-medium mb-2">No tasks found</h3>
                   <p className="text-muted-foreground mb-4">
-                    {searchQuery || selectedCategory || selectedPriority
+                    {hasActiveFilters
                       ? "Try adjusting your filters or search terms."
                       : "Create your first task to get started!"}
                   </p>
-                  {!searchQuery && !selectedCategory && !selectedPriority && (
+                  {!hasActiveFilters && (
                     <TodoCreateForm>
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
@@ -335,3 +340,6 @@ export function TodosPage() {
     </div>
   );
 }
+
+// Re-export query type for filter components that build sort options.
+export type { TGetTodosQuery };

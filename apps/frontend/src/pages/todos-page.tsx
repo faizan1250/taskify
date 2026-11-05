@@ -8,9 +8,15 @@ import { ShortcutHint } from "@/components/command-palette";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
 import { TodoEditForm } from "@/components/todos/todo-edit-form";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -24,15 +30,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  TODOS_SORT_OPTIONS,
   toDueBoundISO,
   useTodosSearchParams,
   type TodosPriorityFilter,
   type TodosSort,
   type TodosTab,
 } from "@/hooks/use-todos-search-params";
+import { useSavedViews } from "@/hooks/use-saved-views";
+import { useTodosFilterChips } from "@/hooks/use-todos-filter-chips";
 import { useTodosHotkeys } from "@/hooks/use-todos-hotkeys";
 import { cn } from "@/lib/utils";
-import { Plus, Search, CheckSquare } from "lucide-react";
+import { Plus, Search, CheckSquare, ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function TodosPage() {
@@ -61,10 +70,12 @@ export function TodosPage() {
     clearDueRange,
     clearFilters,
     hasActiveFilters,
+    activeFilterCount,
   } = useTodosSearchParams();
 
   const [selectedTodos, setSelectedTodos] = useState<string[]>([]);
   const [createOpen, setCreateOpen] = useState(false);
+  const [viewName, setViewName] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const keyboardEditTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -94,6 +105,52 @@ export function TodosPage() {
   });
 
   const { data: stats } = useGetTodoStats();
+
+  const chips = useTodosFilterChips({
+    search: debouncedSearch,
+    category,
+    priority,
+    sortValue,
+    isDefaultSort: sortValue === "updated_at-desc",
+    overdueOnly,
+    dueFrom,
+    dueTo,
+    categories: categories?.data,
+    onClearSearch: () => setSearchInput(""),
+    onClearCategory: () => setCategory("all"),
+    onClearPriority: () => setPriority("all"),
+    onClearSort: () => setSortOrder("updated_at", "desc"),
+    onClearOverdue: () => setOverdueOnly(false),
+    onClearDueFrom: () => setDueFrom(undefined),
+    onClearDueTo: () => setDueTo(undefined),
+  });
+
+  const { views, saveView, applyView, deleteView } = useSavedViews();
+
+  const handleSaveView = () => {
+    const params: Record<string, string> = {};
+    if (tab !== "all") params.tab = tab;
+    if (category !== "all") params.category = category;
+    if (priority !== "all") params.priority = priority;
+    if (sort !== "updated_at") params.sort = sort;
+    if (order !== "desc") params.order = order;
+    if (debouncedSearch !== "") params.q = debouncedSearch;
+    if (overdueOnly) params.overdue = "true";
+    if (dueFrom !== null) params.dueFrom = dueFrom;
+    if (dueTo !== null) params.dueTo = dueTo;
+    saveView(viewName, params);
+    setViewName("");
+  };
+
+  // Return to the top of the list when paginating (skipped on mount).
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    window.scrollTo(0, 0);
+  }, [page]);
 
   const handleSelectTodo = (todoId: string, checked: boolean) => {
     if (checked) {
@@ -170,84 +227,132 @@ export function TodosPage() {
 
       {/* Filters and Search */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Filters & Search</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tasks..."
-                ref={searchRef}
-                value={searchInput}
-                onChange={(e) => {
-                  setSearchInput(e.target.value);
-                }}
-                className="pl-10"
+        <Collapsible defaultOpen>
+          <CardHeader>
+            <CollapsibleTrigger className="group flex w-full cursor-pointer items-center justify-between gap-2 text-left">
+              <span className="flex items-center gap-2">
+                <CardTitle className="text-lg">Filters & Search</CardTitle>
+                {activeFilterCount > 0 && (
+                  <Badge
+                    variant="secondary"
+                    aria-label={`${activeFilterCount} active filters`}
+                  >
+                    {activeFilterCount}
+                  </Badge>
+                )}
+              </span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]:rotate-180"
+                aria-hidden="true"
               />
-            </div>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                {categories?.data?.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      {category.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={priority}
-              onValueChange={(value) =>
-                setPriority(value as TodosPriorityFilter)
-              }
+            </CollapsibleTrigger>
+            <p
+              className="text-sm text-muted-foreground"
+              role="status"
+              aria-live="polite"
             >
-              <SelectTrigger className="w-full sm:w-32">
-                <SelectValue placeholder="Priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={sortValue}
-              onValueChange={(value) => {
-                const [nextSort, nextOrder] = value.split("-");
-                setSortOrder(
-                  nextSort as TodosSort,
-                  nextOrder as "asc" | "desc",
-                );
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-40">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="updated_at-desc">Latest</SelectItem>
-                <SelectItem value="updated_at-asc">Oldest</SelectItem>
-                <SelectItem value="title-asc">Title A-Z</SelectItem>
-                <SelectItem value="title-desc">Title Z-A</SelectItem>
-                <SelectItem value="priority-desc">High Priority</SelectItem>
-                <SelectItem value="due_date-asc">Due Date</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={clearFilters}>
-              Clear
-            </Button>
-          </div>
+              {isLoading
+                ? "Loading tasks…"
+                : `${todos?.total ?? 0} result${todos?.total === 1 ? "" : "s"}`}
+            </p>
+          </CardHeader>
+          <CollapsibleContent>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search tasks..."
+                    ref={searchRef}
+                    value={searchInput}
+                    onChange={(e) => {
+                      setSearchInput(e.target.value);
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories?.data?.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: category.color }}
+                          />
+                          {category.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={priority}
+                  onValueChange={(value) =>
+                    setPriority(value as TodosPriorityFilter)
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-32">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="low">Low</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={sortValue}
+                  onValueChange={(value) => {
+                    const [nextSort, nextOrder] = value.split("-");
+                    setSortOrder(
+                      nextSort as TodosSort,
+                      nextOrder as "asc" | "desc",
+                    );
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TODOS_SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {chips.length > 0 && (
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  aria-label="Active filters"
+                >
+                  {chips.map((chip) => (
+                    <Badge key={chip.key} variant="secondary">
+                      <span className="max-w-48 truncate">{chip.label}</span>
+                      <button
+                        type="button"
+                        onClick={chip.onRemove}
+                        aria-label={`Remove ${chip.label} filter`}
+                        className="cursor-pointer rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 border-t pt-4">
             <div className="flex items-center gap-2.5">
               <Switch
@@ -312,7 +417,62 @@ export function TodosPage() {
               paused until fixed.
             </p>
           )}
-        </CardContent>
+          <div className="space-y-3 border-t pt-4">
+            <Label className="text-xs text-muted-foreground">Saved views</Label>
+            {views.length > 0 && (
+              <div
+                className="flex flex-wrap items-center gap-2"
+                aria-label="Saved views"
+              >
+                {views.map((view) => (
+                  <Badge key={view.id} variant="outline">
+                    <button
+                      type="button"
+                      onClick={() => applyView(view.id)}
+                      title="Apply this saved view"
+                      className="cursor-pointer rounded-sm transition-colors hover:text-primary"
+                    >
+                      <span className="max-w-40 truncate">{view.name}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteView(view.id)}
+                      aria-label={`Delete saved view ${view.name}`}
+                      className="cursor-pointer rounded-sm p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                placeholder="Name this view…"
+                value={viewName}
+                onChange={(e) => setViewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveView();
+                }}
+                maxLength={40}
+                className="w-full sm:max-w-56"
+                aria-label="Saved view name"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSaveView}
+                disabled={viewName.trim() === ""}
+                className="sm:self-center"
+              >
+                Save current filters
+              </Button>
+            </div>
+          </div>
+          </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
 
       {/* Status Tabs */}
@@ -320,14 +480,20 @@ export function TodosPage() {
         value={tab}
         onValueChange={(value) => setTab(value as TodosTab | "all")}
       >
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="all">All ({tabCounts.all})</TabsTrigger>
-          <TabsTrigger value="draft">Draft ({tabCounts.draft})</TabsTrigger>
-          <TabsTrigger value="active">Active ({tabCounts.active})</TabsTrigger>
-          <TabsTrigger value="completed">
+        <TabsList className="flex w-full justify-start gap-1 overflow-x-auto">
+          <TabsTrigger value="all" className="flex-none">
+            All ({tabCounts.all})
+          </TabsTrigger>
+          <TabsTrigger value="draft" className="flex-none">
+            Draft ({tabCounts.draft})
+          </TabsTrigger>
+          <TabsTrigger value="active" className="flex-none">
+            Active ({tabCounts.active})
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="flex-none">
             Completed ({tabCounts.completed})
           </TabsTrigger>
-          <TabsTrigger value="archived">
+          <TabsTrigger value="archived" className="flex-none">
             Archived ({tabCounts.archived})
           </TabsTrigger>
         </TabsList>

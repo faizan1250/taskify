@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,10 +39,61 @@ import {
 import { toast } from "sonner";
 
 export function CategoriesPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
+  // Search + pagination live in the URL so category views are shareable
+  // and survive refresh — same contract as the todos page.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlSearch = searchParams.get("q") ?? "";
+  const [searchInput, setSearchInput] = useState(urlSearch);
 
-  const debouncedSearch = useDebounce(searchQuery, 300);
+  // Sync input when URL changes externally (back/forward, pasted link).
+  useEffect(() => {
+    setSearchInput(urlSearch);
+  }, [urlSearch]);
+
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Push debounced input into the URL, resetting to page 1.
+  useEffect(() => {
+    if (debouncedSearch === urlSearch) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (debouncedSearch === "") next.delete("q");
+        else next.set("q", debouncedSearch);
+        next.delete("page");
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
+
+  const rawPage = Number.parseInt(searchParams.get("page") ?? "", 10);
+  const page =
+    Number.isInteger(rawPage) && rawPage >= 1 ? (rawPage as number) : 1;
+
+  const setPage = (nextPage: number) => {
+    const clamped = Math.max(1, nextPage);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (clamped === 1) next.delete("page");
+        else next.set("page", String(clamped));
+        return next;
+      },
+      { replace: true },
+    );
+  };
+
+  // Return to the top of the grid when paginating (skipped on mount).
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) {
+      didMountRef.current = true;
+      return;
+    }
+    window.scrollTo(0, 0);
+  }, [page]);
 
   const { data: categories, isLoading } = useGetAllCategories({
     query: {
@@ -88,8 +140,8 @@ export function CategoriesPage() {
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search categories..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-10"
             />
           </div>
@@ -235,11 +287,11 @@ export function CategoriesPage() {
               <Folder className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
               <h3 className="text-lg font-medium mb-2">No categories found</h3>
               <p className="text-muted-foreground mb-4">
-                {searchQuery
+                {debouncedSearch
                   ? "Try adjusting your search terms."
                   : "Create your first category to organize your tasks!"}
               </p>
-              {!searchQuery && (
+              {!debouncedSearch && (
                 <CategoryCreateForm>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />

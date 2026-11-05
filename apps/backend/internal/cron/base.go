@@ -10,6 +10,7 @@ import (
 	"github.com/faizan1250/taskify/internal/logger"
 	"github.com/faizan1250/taskify/internal/repository"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 )
@@ -102,6 +103,19 @@ type JobRunner struct {
 	ctx *JobContext
 }
 
+// cronLockTTL bounds how long a crashed instance can hold the lock. While a
+// job runs, a heartbeat goroutine keeps extending the TTL so long jobs never
+// lose the lock mid-run.
+const cronLockTTL = 5 * time.Minute
+
+// renewCronLockScript extends the lock TTL only if this instance still owns
+// the lock. Returns 1 when renewed, 0 otherwise.
+const renewCronLockScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("PEXPIRE", KEYS[1], ARGV[2]) else return 0 end`
+
+// releaseCronLockScript deletes the lock only if this instance still owns it,
+// so a slow job never removes a successor's freshly acquired lock.
+const releaseCronLockScript = `if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end`
+
 func NewJobRunner(job Job) (*JobRunner, error) {
 	ctx, err := NewJobContext()
 	if err != nil {
@@ -121,7 +135,8 @@ func (r *JobRunner) Run() error {
 
 	if r.ctx.Server.Redis != nil {
 		lockKey := fmt.Sprintf("cron:lock:%s", r.job.Name())
-		locked, err := r.ctx.Server.Redis.SetNX(ctx, lockKey, "locked", 5*time.Minute).Result()
+		lockValue := uuid.NewString()
+		locked, err := r.ctx.Server.Redis.SetNX(ctx, lockKey, lockValue, cronLockTTL).Result()
 		if err != nil {
 			r.ctx.Server.Logger.Error().
 				Err(err).
@@ -135,8 +150,31 @@ func (r *JobRunner) Run() error {
 				Msg("Cron job is already running on another instance, skipping execution")
 			return nil
 		}
+		// Release only if we still own the lock (deferred first so it runs
+		// after the heartbeat below has been stopped).
 		defer func() {
-			_ = r.ctx.Server.Redis.Del(context.Background(), lockKey).Err()
+			_ = r.ctx.Server.Redis.Eval(
+				context.Background(), releaseCronLockScript, []string{lockKey}, lockValue,
+			).Err()
+		}()
+		// Heartbeat: keep the lock alive while the job runs so long jobs
+		// (> cronLockTTL) are never executed concurrently by a second instance.
+		stopRenew := make(chan struct{})
+		defer close(stopRenew)
+		go func() {
+			ticker := time.NewTicker(cronLockTTL / 3)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					_ = r.ctx.Server.Redis.Eval(
+						context.Background(), renewCronLockScript, []string{lockKey},
+						lockValue, int64(cronLockTTL/time.Millisecond),
+					).Err()
+				case <-stopRenew:
+					return
+				}
+			}
 		}()
 	}
 

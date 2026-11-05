@@ -49,12 +49,12 @@ func (auth *AuthMiddleware) RequireAuth(next echo.HandlerFunc) echo.HandlerFunc 
 		start := time.Now()
 		claims, ok := clerk.SessionClaimsFromContext(c.Request().Context())
 
-		if !ok {
+		if !ok || claims.Subject == "" {
 			auth.server.Logger.Error().
 				Str("function", "RequireAuth").
 				Str("request_id", GetRequestID(c)).
 				Dur("duration", time.Since(start)).
-				Msg("could not get session claims from context")
+				Msg("missing or empty session claims in context")
 			return errs.NewUnauthorizedError("Unauthorized", false)
 		}
 

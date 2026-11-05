@@ -69,6 +69,9 @@ func (s *S3Client) CreatePresignedUrl(ctx context.Context, bucket string, object
 		&s3.GetObjectInput{
 			Bucket: aws.String(bucket),
 			Key:    aws.String(objectKey),
+			// Force download so user-controlled content (e.g. SVG/HTML
+			// attachments) never renders inline in the bucket origin.
+			ResponseContentDisposition: aws.String("attachment"),
 		},
 		s3.WithPresignExpires(expiration))
 	if err != nil {

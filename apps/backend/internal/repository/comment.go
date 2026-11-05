@@ -2,9 +2,9 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
+	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/model/comment"
 	"github.com/faizan1250/taskify/internal/server"
 	"github.com/google/uuid"
@@ -155,7 +155,8 @@ func (r *CommentRepository) DeleteComment(ctx context.Context, userID string, co
 	}
 
 	if result.RowsAffected() == 0 {
-		return errors.New("comment not found")
+		code := "COMMENT_NOT_FOUND"
+		return errs.NewNotFoundError("comment not found", false, &code)
 	}
 
 	return nil

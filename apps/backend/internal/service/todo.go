@@ -23,13 +23,13 @@ import (
 
 type TodoService struct {
 	server       *server.Server
-	todoRepo     *repository.TodoRepository
-	categoryRepo *repository.CategoryRepository
+	todoRepo     repository.TodoRepositoryInterface
+	categoryRepo repository.CategoryRepositoryInterface
 	awsClient    *aws.AWS
 }
 
-func NewTodoService(server *server.Server, todoRepo *repository.TodoRepository,
-	categoryRepo *repository.CategoryRepository, awsClient *aws.AWS,
+func NewTodoService(server *server.Server, todoRepo repository.TodoRepositoryInterface,
+	categoryRepo repository.CategoryRepositoryInterface, awsClient *aws.AWS,
 ) *TodoService {
 	return &TodoService{
 		server:       server,

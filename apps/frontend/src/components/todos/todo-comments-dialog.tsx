@@ -205,7 +205,7 @@ export function TodoCommentsDialog({ todoId, children }: TodoCommentsDialogProps
                             {comment.userId === user?.id && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="icon" className="h-6 w-6">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Comment actions">
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>

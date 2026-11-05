@@ -78,7 +78,7 @@ export function AppLayout({ children }: AppLayoutProps) {
           <h1 className="text-xl font-bold">Taskify</h1>
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
               </Button>
             </SheetTrigger>

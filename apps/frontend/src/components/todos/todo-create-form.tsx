@@ -386,6 +386,7 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
                         size="sm"
                         onClick={() => removeAttachment(index)}
                         disabled={createTodo.isPending}
+                        aria-label={`Remove attachment ${file.name}`}
                       >
                         <X className="h-4 w-4" />
                       </Button>

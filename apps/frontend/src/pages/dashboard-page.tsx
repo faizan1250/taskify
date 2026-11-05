@@ -29,29 +29,33 @@ export function DashboardPage() {
       title: "Total Tasks",
       value: stats?.total || 0,
       icon: CheckCircle,
-      color: "text-blue-600",
-      bgColor: "bg-blue-50 dark:bg-blue-950",
+      color: "text-blue-600 dark:text-blue-400",
+      bgColor:
+        "border border-blue-500/30 bg-gradient-to-b from-blue-500/15 to-blue-500/5",
     },
     {
       title: "Active",
       value: stats?.active || 0,
       icon: Clock,
-      color: "text-green-600",
-      bgColor: "bg-green-50 dark:bg-green-950",
+      color: "text-green-600 dark:text-green-400",
+      bgColor:
+        "border border-green-500/30 bg-gradient-to-b from-green-500/15 to-green-500/5",
     },
     {
       title: "Overdue",
       value: stats?.overdue || 0,
       icon: AlertTriangle,
-      color: "text-red-600",
-      bgColor: "bg-red-50 dark:bg-red-950",
+      color: "text-red-600 dark:text-red-400",
+      bgColor:
+        "border border-red-500/30 bg-gradient-to-b from-red-500/15 to-red-500/5",
     },
     {
       title: "Completed",
       value: stats?.completed || 0,
       icon: Archive,
-      color: "text-gray-600",
-      bgColor: "bg-gray-50 dark:bg-gray-950",
+      color: "text-gray-600 dark:text-gray-400",
+      bgColor:
+        "border border-gray-500/30 bg-gradient-to-b from-gray-500/15 to-gray-500/5",
     },
   ];
 

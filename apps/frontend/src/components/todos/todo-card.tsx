@@ -36,7 +36,6 @@ import {
   Clock,
   CheckCircle2,
   Circle,
-  AlertTriangle,
   Archive,
   Paperclip,
   ChevronDown,
@@ -53,19 +52,18 @@ interface TodoCardProps {
 
 const priorityConfig = {
   low: {
-    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+    variant: "success",
     label: "Low",
   },
   medium: {
-    color:
-      "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+    variant: "warning",
     label: "Medium",
   },
   high: {
-    color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+    variant: "danger",
     label: "High",
   },
-};
+} as const;
 
 const statusConfig = {
   draft: { icon: Circle, color: "text-gray-500", label: "Draft" },
@@ -168,7 +166,14 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                       {todo.title}
                     </h3>
                     {isOverdue && (
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
+                      <span
+                        className="relative flex h-2 w-2 shrink-0"
+                        role="status"
+                        aria-label="Overdue"
+                      >
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-60 motion-safe:animate-ping" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                      </span>
                     )}
                   </div>
 
@@ -217,10 +222,7 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
             {/* Metadata */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className={priorityConfig[todo.priority].color}
-                >
+                <Badge variant={priorityConfig[todo.priority].variant}>
                   {priorityConfig[todo.priority].label}
                 </Badge>
 
@@ -239,7 +241,7 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
 
                 {todo.dueDate && (
                   <Badge
-                    variant={isOverdue ? "destructive" : "outline"}
+                    variant={isOverdue ? "danger" : "outline"}
                     className="flex items-center gap-1"
                   >
                     <Calendar className="h-3 w-3" />

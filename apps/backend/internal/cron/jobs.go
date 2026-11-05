@@ -69,13 +69,6 @@ func (j *DueDateRemindersJob) Run(ctx context.Context, jobCtx *JobContext) error
 			continue
 		}
 
-		if err := jobCtx.Repositories.Todo.MarkDueDateReminderSent(ctx, todo.ID); err != nil {
-			jobCtx.Server.Logger.Error().
-				Err(err).
-				Str("todo_id", todo.ID.String()).
-				Msg("Failed to mark due date reminder sent")
-		}
-
 		enqueuedCount++
 		jobCtx.Server.Logger.Info().
 			Str("todo_id", todo.ID.String()).
@@ -151,13 +144,6 @@ func (j *OverdueNotificationsJob) Run(ctx context.Context, jobCtx *JobContext) e
 				Str("user_id", todo.UserID).
 				Msg("Failed to enqueue overdue notification")
 			continue
-		}
-
-		if err := jobCtx.Repositories.Todo.MarkOverdueNotificationSent(ctx, todo.ID); err != nil {
-			jobCtx.Server.Logger.Error().
-				Err(err).
-				Str("todo_id", todo.ID.String()).
-				Msg("Failed to mark overdue notification sent")
 		}
 
 		enqueuedCount++

@@ -90,10 +90,31 @@ func TestGenerateReminderTaskID_CustomType(t *testing.T) {
 type mockTodoRepo struct {
 	status string
 	err    error
+
+	markReminderErr error
+	markOverdueErr  error
+	reminderMarked  []uuid.UUID
+	overdueMarked   []uuid.UUID
 }
 
 func (m *mockTodoRepo) GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error) {
 	return m.status, m.err
+}
+
+func (m *mockTodoRepo) MarkDueDateReminderSent(ctx context.Context, todoID uuid.UUID) error {
+	if m.markReminderErr != nil {
+		return m.markReminderErr
+	}
+	m.reminderMarked = append(m.reminderMarked, todoID)
+	return nil
+}
+
+func (m *mockTodoRepo) MarkOverdueNotificationSent(ctx context.Context, todoID uuid.UUID) error {
+	if m.markOverdueErr != nil {
+		return m.markOverdueErr
+	}
+	m.overdueMarked = append(m.overdueMarked, todoID)
+	return nil
 }
 
 type mockAuthService struct {
@@ -143,10 +164,11 @@ func TestHandleReminderEmailTask_FreshnessGuard(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &job.JobService{}
 			svc.SetLogger(&logger)
-			svc.SetTodoRepository(&mockTodoRepo{
+			repo := &mockTodoRepo{
 				status: tt.status,
 				err:    tt.repoErr,
-			})
+			}
+			svc.SetTodoRepository(repo)
 			svc.SetAuthService(&mockAuthService{
 				email: "user@example.com",
 			})
@@ -171,6 +193,9 @@ func TestHandleReminderEmailTask_FreshnessGuard(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+			// Nothing was delivered on these paths, so nothing may be marked sent.
+			assert.Empty(t, repo.reminderMarked, "due-date reminder must not be marked sent without delivery")
+			assert.Empty(t, repo.overdueMarked, "overdue notification must not be marked sent without delivery")
 		})
 	}
 }

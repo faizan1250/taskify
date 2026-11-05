@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/faizan1250/taskify/internal/errs"
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/category"
 	"github.com/faizan1250/taskify/internal/server"
@@ -235,7 +236,8 @@ func (r *CategoryRepository) DeleteCategory(ctx context.Context, userID string, 
 	}
 
 	if result.RowsAffected() == 0 {
-		return errors.New("category not found")
+		code := "CATEGORY_NOT_FOUND"
+		return errs.NewNotFoundError("category not found", false, &code)
 	}
 
 	return nil

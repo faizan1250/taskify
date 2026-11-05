@@ -100,14 +100,14 @@ func requireHTTPError(t *testing.T, err error, status int) *errs.HTTPError {
 // ---------------------------------------------------------------------------
 
 type FakeTodoService struct {
-	CreateTodoFn              func(ctx echo.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error)
-	GetTodoByIDFn             func(ctx echo.Context, userID string, todoID uuid.UUID) (*todo.PopulatedTodo, error)
-	GetTodosFn                func(ctx echo.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
-	UpdateTodoFn              func(ctx echo.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
-	DeleteTodoFn              func(ctx echo.Context, userID string, todoID uuid.UUID) error
-	GetTodoStatsFn            func(ctx echo.Context, userID string) (*todo.TodoStats, error)
-	UploadTodoAttachmentFn    func(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
-	DeleteTodoAttachmentFn    func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error
+	CreateTodoFn                func(ctx echo.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error)
+	GetTodoByIDFn               func(ctx echo.Context, userID string, todoID uuid.UUID) (*todo.PopulatedTodo, error)
+	GetTodosFn                  func(ctx echo.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
+	UpdateTodoFn                func(ctx echo.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
+	DeleteTodoFn                func(ctx echo.Context, userID string, todoID uuid.UUID) error
+	GetTodoStatsFn              func(ctx echo.Context, userID string) (*todo.TodoStats, error)
+	UploadTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
+	DeleteTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentPresignedURLFn func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) (string, error)
 }
 

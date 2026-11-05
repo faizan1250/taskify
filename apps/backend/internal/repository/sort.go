@@ -7,7 +7,7 @@ const maxPageLimit = 100
 // allowedTodoSortColumns maps client-supplied sort keys for todos to safe,
 // fully-qualified SQL identifiers. Any value not present in this map falls
 // back to the default column so unsanitized input can never reach the query.
-var allowedTodoSortColumns = map[string]string{
+var allowedTodoSortColumns = map[string]string{ //nolint:gochecknoglobals // read-only sort-key whitelist shared by todo/category query builders; Go has no const maps and this table is never mutated.
 	"created_at": "t.created_at",
 	"updated_at": "t.updated_at",
 	"title":      "t.title",
@@ -18,7 +18,7 @@ var allowedTodoSortColumns = map[string]string{
 
 // allowedCategorySortColumns maps client-supplied sort keys for categories
 // to safe SQL identifiers.
-var allowedCategorySortColumns = map[string]string{
+var allowedCategorySortColumns = map[string]string{ //nolint:gochecknoglobals // read-only sort-key whitelist shared by todo/category query builders; Go has no const maps and this table is never mutated.
 	"created_at": "created_at",
 	"updated_at": "updated_at",
 	"name":       "name",

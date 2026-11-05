@@ -1,8 +1,9 @@
-package repository
+package repository_test
 
 import (
 	"testing"
 
+	"github.com/faizan1250/taskify/internal/repository"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -11,6 +12,8 @@ func strPtr(s string) *string { return &s }
 func intPtr(i int) *int { return &i }
 
 func TestResolveSortColumn(t *testing.T) {
+	allowedTodo := repository.AllowedTodoSortColumnsForTest()
+	allowedCategory := repository.AllowedCategorySortColumnsForTest()
 	tests := []struct {
 		name     string
 		sort     *string
@@ -18,20 +21,20 @@ func TestResolveSortColumn(t *testing.T) {
 		fallback string
 		want     string
 	}{
-		{"nil sort returns fallback", nil, allowedTodoSortColumns, "t.created_at", "t.created_at"},
-		{"valid todo sort maps to qualified column", strPtr("due_date"), allowedTodoSortColumns, "t.created_at", "t.due_date"},
-		{"valid category sort maps to column", strPtr("name"), allowedCategorySortColumns, "name", "name"},
-		{"unknown sort returns fallback", strPtr("nonexistent"), allowedTodoSortColumns, "t.created_at", "t.created_at"},
-		{"empty sort returns fallback", strPtr(""), allowedTodoSortColumns, "t.created_at", "t.created_at"},
+		{"nil sort returns fallback", nil, allowedTodo, "t.created_at", "t.created_at"},
+		{"valid todo sort maps to qualified column", strPtr("due_date"), allowedTodo, "t.created_at", "t.due_date"},
+		{"valid category sort maps to column", strPtr("name"), allowedCategory, "name", "name"},
+		{"unknown sort returns fallback", strPtr("nonexistent"), allowedTodo, "t.created_at", "t.created_at"},
+		{"empty sort returns fallback", strPtr(""), allowedTodo, "t.created_at", "t.created_at"},
 		{
 			"sql injection in sort returns fallback",
 			strPtr("created_at; DROP TABLE todos; --"),
-			allowedTodoSortColumns, "t.created_at", "t.created_at",
+			allowedTodo, "t.created_at", "t.created_at",
 		},
 		{
 			"boolean injection in sort returns fallback",
 			strPtr("created_at DESC, (SELECT 1 WHERE 1=1)"),
-			allowedTodoSortColumns, "t.created_at", "t.created_at",
+			allowedTodo, "t.created_at", "t.created_at",
 		},
 		{
 			"unqualified column name is not trusted",
@@ -41,13 +44,13 @@ func TestResolveSortColumn(t *testing.T) {
 		{
 			"todo sort key rejected for categories",
 			strPtr("title"),
-			allowedCategorySortColumns, "name", "name",
+			allowedCategory, "name", "name",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, resolveSortColumn(tt.sort, tt.allowed, tt.fallback))
+			assert.Equal(t, tt.want, repository.ResolveSortColumnForTest(tt.sort, tt.allowed, tt.fallback))
 		})
 	}
 }
@@ -69,26 +72,26 @@ func TestResolveSortOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, resolveSortOrder(tt.order, tt.fallback))
+			assert.Equal(t, tt.want, repository.ResolveSortOrderForTest(tt.order, tt.fallback))
 		})
 	}
 }
 
 func TestNormalizePage(t *testing.T) {
-	assert.Equal(t, 1, normalizePage(nil))
-	assert.Equal(t, 1, normalizePage(intPtr(0)))
-	assert.Equal(t, 1, normalizePage(intPtr(-3)))
-	assert.Equal(t, 1, normalizePage(intPtr(1)))
-	assert.Equal(t, 4, normalizePage(intPtr(4)))
+	assert.Equal(t, 1, repository.NormalizePageForTest(nil))
+	assert.Equal(t, 1, repository.NormalizePageForTest(intPtr(0)))
+	assert.Equal(t, 1, repository.NormalizePageForTest(intPtr(-3)))
+	assert.Equal(t, 1, repository.NormalizePageForTest(intPtr(1)))
+	assert.Equal(t, 4, repository.NormalizePageForTest(intPtr(4)))
 }
 
 func TestNormalizeLimit(t *testing.T) {
-	assert.Equal(t, 20, normalizeLimit(nil, 20))
-	assert.Equal(t, 50, normalizeLimit(nil, 50))
-	assert.Equal(t, 20, normalizeLimit(intPtr(0), 20))
-	assert.Equal(t, 20, normalizeLimit(intPtr(-5), 20))
-	assert.Equal(t, 25, normalizeLimit(intPtr(25), 20))
-	assert.Equal(t, 100, normalizeLimit(intPtr(100), 20))
-	assert.Equal(t, 100, normalizeLimit(intPtr(101), 20))
-	assert.Equal(t, 100, normalizeLimit(intPtr(10000), 50))
+	assert.Equal(t, 20, repository.NormalizeLimitForTest(nil, 20))
+	assert.Equal(t, 50, repository.NormalizeLimitForTest(nil, 50))
+	assert.Equal(t, 20, repository.NormalizeLimitForTest(intPtr(0), 20))
+	assert.Equal(t, 20, repository.NormalizeLimitForTest(intPtr(-5), 20))
+	assert.Equal(t, 25, repository.NormalizeLimitForTest(intPtr(25), 20))
+	assert.Equal(t, 100, repository.NormalizeLimitForTest(intPtr(100), 20))
+	assert.Equal(t, 100, repository.NormalizeLimitForTest(intPtr(101), 20))
+	assert.Equal(t, 100, repository.NormalizeLimitForTest(intPtr(10000), 50))
 }

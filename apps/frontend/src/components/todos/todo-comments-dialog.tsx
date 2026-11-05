@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useUser } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
+import { ErrorBoundary } from "@/components/error-boundary";
 import {
   Dialog,
   DialogContent,
@@ -168,6 +169,10 @@ export function TodoCommentsDialog({ todoId, children }: TodoCommentsDialogProps
           </DialogHeader>
           
           <div className="flex-1 flex flex-col min-h-0">
+            <ErrorBoundary
+              fallbackTitle="Comments failed to load"
+              fallbackMessage="Could not load comments for this task. Please try again."
+            >
             {/* Comments List */}
             <ScrollArea className="flex-1 pr-4">
               <div className="space-y-4">
@@ -312,6 +317,7 @@ export function TodoCommentsDialog({ todoId, children }: TodoCommentsDialogProps
                 </form>
               </Form>
             </div>
+            </ErrorBoundary>
           </div>
         </DialogContent>
       </Dialog>

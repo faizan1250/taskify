@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { UserButton } from "@clerk/clerk-react";
 import { Link, useLocation } from "react-router-dom";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
@@ -115,7 +116,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         {/* Page Content */}
         <main className="py-6">
           <div className="px-4 sm:px-6 lg:px-8">
-            {children}
+            <ErrorBoundary fallbackTitle="Page failed to load">
+              {children}
+            </ErrorBoundary>
           </div>
         </main>
       </div>

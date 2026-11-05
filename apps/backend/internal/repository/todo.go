@@ -361,8 +361,19 @@ func (r *TodoRepository) UpdateTodo(ctx context.Context, userID string, payload 
 	}
 
 	if payload.DueDate != nil {
-		setClauses = append(setClauses, "due_date = @due_date", "reminder_sent_at = NULL", "overdue_notified_at = NULL")
+		setClauses = append(setClauses, "due_date = @due_date")
 		args["due_date"] = *payload.DueDate
+
+		// Reminder flags record notifications sent for a specific due date.
+		// Reset them only when the due date actually changes; re-saving the
+		// same due date must not clear them or reminders go out twice.
+		existing, err := r.CheckTodoExists(ctx, userID, payload.ID)
+		if err != nil {
+			return nil, err
+		}
+		if existing.DueDate == nil || !existing.DueDate.Equal(*payload.DueDate) {
+			setClauses = append(setClauses, "reminder_sent_at = NULL", "overdue_notified_at = NULL")
+		}
 	}
 
 	if payload.ParentTodoID != nil {

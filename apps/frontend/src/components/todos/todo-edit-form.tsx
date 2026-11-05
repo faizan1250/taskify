@@ -1,5 +1,6 @@
 import { useGetAllCategories } from "@/api/hooks/use-category-query";
 import {
+  useGetAllTodos,
   useUpdateTodo,
   type TGetTodosResponse,
 } from "@/api/hooks/use-todo-query";
@@ -52,6 +53,7 @@ const updateTodoSchema = z.object({
   status: z.enum(["draft", "active", "completed", "archived"]),
   priority: z.enum(["low", "medium", "high"]),
   categoryId: z.string().optional(),
+  parentTodoId: z.string().optional(),
   dueDate: z.date().optional(),
 });
 
@@ -71,6 +73,13 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
   const { data: categories } = useGetAllCategories({
     query: { page: 1, limit: 100 },
   });
+  const { data: todos } = useGetAllTodos({
+    query: { page: 1, limit: 100 },
+  });
+  const childIds = new Set((todo.children ?? []).map((c) => c.id));
+  const parentCandidates = (todos?.data ?? []).filter(
+    (t) => t.id !== todo.id && !childIds.has(t.id) && t.parentTodoId == null,
+  );
 
   const form = useForm<UpdateTodoForm>({
     resolver: zodResolver(updateTodoSchema),
@@ -80,6 +89,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
       status: todo.status,
       priority: todo.priority,
       categoryId: todo.categoryId || "none",
+      parentTodoId: todo.parentTodoId || "none",
       dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
     },
   });
@@ -92,6 +102,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
         status: todo.status,
         priority: todo.priority,
         categoryId: todo.categoryId || "none",
+        parentTodoId: todo.parentTodoId || "none",
         dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
       });
       setAttachments([]);
@@ -129,6 +140,10 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
           priority: data.priority,
           categoryId:
             data.categoryId === "none" ? undefined : data.categoryId || undefined,
+          parentTodoId:
+            data.parentTodoId === "none"
+              ? undefined
+              : data.parentTodoId || undefined,
           dueDate: data.dueDate?.toISOString(),
         },
       });
@@ -319,6 +334,46 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
                     </SelectContent>
                   </Select>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="parentTodoId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Parent Task</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={
+                      updateTodo.isPending || (todo.children ?? []).length > 0
+                    }
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="No parent (top-level task)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        No parent (top-level task)
+                      </SelectItem>
+                      {parentCandidates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {(todo.children ?? []).length > 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      This task has subtasks, so it must stay top-level.
+                    </p>
+                  ) : (
+                    <FormMessage />
+                  )}
                 </FormItem>
               )}
             />

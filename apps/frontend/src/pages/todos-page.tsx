@@ -2,6 +2,7 @@ import { useGetAllCategories } from "@/api/hooks/use-category-query";
 import { useDebounce } from "@/api/hooks/use-debounce";
 import {
   useGetAllTodos,
+  useGetTodoStats,
   type TGetTodosQuery,
 } from "@/api/hooks/use-todo-query";
 import { TodoCard } from "@/components/todos/todo-card";
@@ -54,6 +55,8 @@ export function TodosPage() {
     query: { page: 1, limit: 100 },
   });
 
+  const { data: stats } = useGetTodoStats();
+
   const handleSelectTodo = (todoId: string, checked: boolean) => {
     if (checked) {
       setSelectedTodos((prev) => [...prev, todoId]);
@@ -80,11 +83,11 @@ export function TodosPage() {
   };
 
   const tabCounts = {
-    all: todos?.total || 0,
-    draft: 0, // You can get these from stats if needed
-    active: 0,
-    completed: 0,
-    archived: 0,
+    all: stats?.total || 0,
+    draft: stats?.draft || 0,
+    active: stats?.active || 0,
+    completed: stats?.completed || 0,
+    archived: stats?.archived || 0,
   };
 
   return (

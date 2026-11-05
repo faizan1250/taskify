@@ -111,21 +111,17 @@ func (r *CategoryRepository) GetCategories(ctx context.Context, userID string,
 		args["search"] = *query.Search
 	}
 
-	// Add sorting
-	sortColumn := "name"
-	if query.Sort != nil {
-		sortColumn = *query.Sort
-	}
-	sortOrder := "asc"
-	if query.Order != nil {
-		sortOrder = *query.Order
-	}
+	// Add sorting through an allowlist so unsanitized input never reaches the query.
+	sortColumn := resolveSortColumn(query.Sort, allowedCategorySortColumns, "name")
+	sortOrder := resolveSortOrder(query.Order, "asc")
 	stmt += fmt.Sprintf(" ORDER BY %s %s", sortColumn, sortOrder)
 
-	// Add pagination
+	// Add pagination with nil guards and a max cap.
+	page := normalizePage(query.Page)
+	limit := normalizeLimit(query.Limit, 50)
 	stmt += ` LIMIT @limit OFFSET @offset`
-	args["limit"] = *query.Limit
-	args["offset"] = (*query.Page - 1) * (*query.Limit)
+	args["limit"] = limit
+	args["offset"] = (page - 1) * limit
 
 	rows, err := r.server.DB.Pool.Query(ctx, stmt, args)
 	if err != nil {
@@ -137,8 +133,8 @@ func (r *CategoryRepository) GetCategories(ctx context.Context, userID string,
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &model.PaginatedResponse[category.Category]{
 				Data:       []category.Category{},
-				Page:       *query.Page,
-				Limit:      *query.Limit,
+				Page:       page,
+				Limit:      limit,
 				Total:      0,
 				TotalPages: 0,
 			}, nil
@@ -173,10 +169,10 @@ func (r *CategoryRepository) GetCategories(ctx context.Context, userID string,
 
 	return &model.PaginatedResponse[category.Category]{
 		Data:       categories,
-		Page:       *query.Page,
-		Limit:      *query.Limit,
+		Page:       page,
+		Limit:      limit,
 		Total:      total,
-		TotalPages: (total + *query.Limit - 1) / *query.Limit,
+		TotalPages: (total + limit - 1) / limit,
 	}, nil
 }
 

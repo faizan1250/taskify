@@ -69,10 +69,10 @@ type AWSConfig struct {
 }
 
 type CronConfig struct {
-	ArchiveDaysThreshold        int `koanf:"archive_days_threshold"`
-	BatchSize                   int `koanf:"batch_size"`
-	ReminderHours               int `koanf:"reminder_hours"`
-	MaxTodosPerUserNotification int `koanf:"max_todos_per_user_notification"`
+	ArchiveDaysThreshold        int `koanf:"archive_days_threshold" validate:"required,gt=0"`
+	BatchSize                   int `koanf:"batch_size" validate:"required,gt=0"`
+	ReminderHours               int `koanf:"reminder_hours" validate:"required,gt=0"`
+	MaxTodosPerUserNotification int `koanf:"max_todos_per_user_notification" validate:"required,gt=0"`
 }
 
 func DefaultCronConfig() *CronConfig {
@@ -81,6 +81,27 @@ func DefaultCronConfig() *CronConfig {
 		BatchSize:                   100,
 		ReminderHours:               24,
 		MaxTodosPerUserNotification: 10,
+	}
+}
+
+// applyDefaults fills zero-valued fields from def. Koanf cannot distinguish
+// an unset field from an explicitly-set zero, so a partial cron section (or
+// zero env values) would otherwise leave footguns like
+// ArchiveDaysThreshold: 0 ("archive everything"). Negative values are left
+// untouched so struct validation rejects them instead of silently masking a
+// misconfiguration.
+func (c *CronConfig) applyDefaults(def *CronConfig) {
+	if c.ArchiveDaysThreshold == 0 {
+		c.ArchiveDaysThreshold = def.ArchiveDaysThreshold
+	}
+	if c.BatchSize == 0 {
+		c.BatchSize = def.BatchSize
+	}
+	if c.ReminderHours == 0 {
+		c.ReminderHours = def.ReminderHours
+	}
+	if c.MaxTodosPerUserNotification == 0 {
+		c.MaxTodosPerUserNotification = def.MaxTodosPerUserNotification
 	}
 }
 
@@ -236,6 +257,8 @@ func LoadConfig() (*Config, error) {
 
 	if mainConfig.Cron == nil {
 		mainConfig.Cron = DefaultCronConfig()
+	} else {
+		mainConfig.Cron.applyDefaults(DefaultCronConfig())
 	}
 
 	validate := validator.New()

@@ -1,3 +1,4 @@
+@import "@fontsource-variable/inter-tight";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./components/ui/line-clamp.css";
@@ -40,11 +41,33 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-action-primary: var(--action-primary);
+  --color-action-primary-foreground: var(--action-primary-foreground);
+}
+
+@theme {
+  --font-display: "Inter Tight Variable", "Inter Tight", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-sans: "Inter Tight Variable", "Inter Tight", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+
+  --shadow-tier-1: 0 1px 2px rgb(0 0 0 / 0.06);
+  --shadow-tier-2:
+    inset 0 1px 0 rgb(255 255 255 / 0.08), 0 2px 6px rgb(0 0 0 / 0.22);
+  --shadow-tier-3:
+    inset 0 1px 0 rgb(255 255 255 / 0.25), 0 2px 6px rgb(0 0 0 / 0.28);
 }
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --background: oklch(0.984 0.005 230);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
@@ -75,6 +98,21 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Brand primitives — teal sourced at oklch(0.55 0.12 230), ramp stepped around it */
+  --brand-50: oklch(0.97 0.03 230);
+  --brand-100: oklch(0.93 0.05 230);
+  --brand-200: oklch(0.86 0.08 230);
+  --brand-300: oklch(0.76 0.1 230);
+  --brand-500: oklch(0.55 0.12 230);
+  --brand-600: oklch(0.47 0.11 230);
+  --brand-700: oklch(0.39 0.09 230);
+  /* Semantic action token — UI code references this, never the brand ramp */
+  --action-primary: var(--brand-500);
+  --action-primary-foreground: oklch(1 0 0);
+  /* Motion tokens — quick: hover/press, base: simple transitions, compose: complex */
+  --motion-quick: 150ms ease-out;
+  --motion-base: 250ms ease-out;
+  --motion-compose: 400ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .dark {
@@ -82,7 +120,7 @@
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: oklch(0.24 0 0);
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
@@ -109,6 +147,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  /* Stepped dark action: lighter ramp stop holds contrast on near-black surfaces */
+  --action-primary: var(--brand-300);
+  --action-primary-foreground: oklch(0.22 0.03 230);
 }
 
 @layer base {

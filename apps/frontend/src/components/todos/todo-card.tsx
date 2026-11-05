@@ -39,6 +39,9 @@ import {
   AlertTriangle,
   Archive,
   Paperclip,
+  ChevronDown,
+  ChevronRight,
+  ListTree,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -77,10 +80,15 @@ const statusConfig = {
 
 export function TodoCard({ todo, compact = false }: TodoCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [subtasksExpanded, setSubtasksExpanded] = useState(false);
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
 
   const StatusIcon = statusConfig[todo.status].icon;
+  const subtasks = todo.children ?? [];
+  const completedSubtasks = subtasks.filter(
+    (child) => child.status === "completed",
+  ).length;
 
   const handleStatusToggle = async () => {
     const newStatus = todo.status === "completed" ? "active" : "completed";
@@ -98,6 +106,17 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
       );
     } catch {
       toast.error("Failed to update task status");
+    }
+  };
+
+  const handleSubtaskToggle = async (childId: string, completed: boolean) => {
+    try {
+      await updateTodo.mutateAsync({
+        todoId: childId,
+        body: { status: completed ? "active" : "completed" },
+      });
+    } catch {
+      toast.error("Failed to update subtask");
     }
   };
 
@@ -245,6 +264,28 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                     {todo.attachments.length}
                   </Badge>
                 )}
+
+                {subtasks.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1 h-6 px-2 text-xs"
+                    onClick={() => setSubtasksExpanded((v) => !v)}
+                    aria-expanded={subtasksExpanded}
+                    aria-label={
+                      subtasksExpanded ? "Collapse subtasks" : "Expand subtasks"
+                    }
+                  >
+                    <ListTree className="h-3 w-3" />
+                    {completedSubtasks}/{subtasks.length}
+                    {subtasksExpanded ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                  </Button>
+                )}
               </div>
 
               {!compact && (
@@ -255,6 +296,53 @@ export function TodoCard({ todo, compact = false }: TodoCardProps) {
                 </div>
               )}
             </div>
+
+            {/* Expandable subtasks */}
+            {subtasksExpanded && subtasks.length > 0 && (
+              <ul className="mt-1 space-y-1 border-t pt-2" aria-label="Subtasks">
+                {subtasks.map((child) => {
+                  const isDone = child.status === "completed";
+                  return (
+                    <li
+                      key={child.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60"
+                    >
+                      <Checkbox
+                        checked={isDone}
+                        onCheckedChange={() =>
+                          handleSubtaskToggle(child.id, isDone)
+                        }
+                        disabled={updateTodo.isPending}
+                        aria-label={`Toggle subtask ${child.title}`}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span
+                        className={cn(
+                          "flex-1 truncate text-sm",
+                          isDone && "line-through text-muted-foreground",
+                        )}
+                      >
+                        {child.title}
+                      </span>
+                      {child.priority && (
+                        <span
+                          className={cn(
+                            "h-1.5 w-1.5 rounded-full shrink-0",
+                            child.priority === "high" && "bg-red-500",
+                            child.priority === "medium" && "bg-yellow-500",
+                            child.priority === "low" && "bg-green-500",
+                          )}
+                          title={`${child.priority} priority`}
+                        />
+                      )}
+                      <span className="shrink-0 text-[11px] capitalize text-muted-foreground">
+                        {child.status}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -1,5 +1,5 @@
 import { useGetAllCategories } from "@/api/hooks/use-category-query";
-import { useCreateTodo } from "@/api/hooks/use-todo-query";
+import { useCreateTodo, useGetAllTodos } from "@/api/hooks/use-todo-query";
 import { useUploadTodoAttachment } from "@/api/hooks/use-todo-attachment-query";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -47,6 +47,7 @@ const createTodoSchema = z.object({
   description: z.string().optional(),
   priority: z.enum(["low", "medium", "high"]),
   categoryId: z.string().optional(),
+  parentTodoId: z.string().optional(),
   dueDate: z.date().optional(),
 });
 
@@ -65,6 +66,12 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
   const { data: categories } = useGetAllCategories({
     query: { page: 1, limit: 100 },
   });
+  const { data: todos } = useGetAllTodos({
+    query: { page: 1, limit: 100 },
+  });
+  const parentCandidates = (todos?.data ?? []).filter(
+    (t) => t.parentTodoId == null,
+  );
 
   const form = useForm<CreateTodoForm>({
     resolver: zodResolver(createTodoSchema),
@@ -73,6 +80,7 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
       description: "",
       priority: "medium",
       categoryId: "none",
+      parentTodoId: "none",
     },
   });
 
@@ -105,6 +113,10 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
           priority: data.priority,
           categoryId:
             data.categoryId === "none" ? undefined : data.categoryId || undefined,
+          parentTodoId:
+            data.parentTodoId === "none"
+              ? undefined
+              : data.parentTodoId || undefined,
           dueDate: data.dueDate?.toISOString(),
         },
       });
@@ -252,6 +264,38 @@ export function TodoCreateForm({ children }: TodoCreateFormProps) {
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="parentTodoId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Parent Task</FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={createTodo.isPending}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="No parent (top-level task)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">
+                        No parent (top-level task)
+                      </SelectItem>
+                      {parentCandidates.map((todo) => (
+                        <SelectItem key={todo.id} value={todo.id}>
+                          {todo.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

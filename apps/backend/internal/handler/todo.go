@@ -8,16 +8,15 @@ import (
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/server"
-	"github.com/faizan1250/taskify/internal/service"
 	"github.com/labstack/echo/v4"
 )
 
 type TodoHandler struct {
 	Handler
-	todoService *service.TodoService
+	todoService TodoServiceContract
 }
 
-func NewTodoHandler(s *server.Server, todoService *service.TodoService) *TodoHandler {
+func NewTodoHandler(s *server.Server, todoService TodoServiceContract) *TodoHandler {
 	return &TodoHandler{
 		Handler:     NewHandler(s),
 		todoService: todoService,

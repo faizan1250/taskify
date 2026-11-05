@@ -39,7 +39,7 @@ func TestTodoHandler_CreateTodo(t *testing.T) {
 		fake := &FakeTodoService{
 			CreateTodoFn: func(ctx echo.Context, userID string, payload *todo.CreateTodoPayload) (*todo.Todo, error) {
 				called = true
-				return nil, nil
+				return nil, errFakeService
 			},
 		}
 		h := handler.NewTodoHandler(&server.Server{}, fake)

@@ -38,7 +38,7 @@ func TestCategoryHandler_CreateCategory(t *testing.T) {
 		fake := &FakeCategoryService{
 			CreateCategoryFn: func(ctx echo.Context, userID string, payload *category.CreateCategoryPayload) (*category.Category, error) {
 				called = true
-				return nil, nil
+				return nil, errFakeService
 			},
 		}
 		h := handler.NewCategoryHandler(&server.Server{}, fake)

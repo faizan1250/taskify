@@ -39,7 +39,7 @@ func TestCommentHandler_AddComment(t *testing.T) {
 		fake := &FakeCommentService{
 			AddCommentFn: func(ctx echo.Context, userID string, tid uuid.UUID, payload *comment.AddCommentPayload) (*comment.Comment, error) {
 				called = true
-				return nil, nil
+				return nil, errFakeService
 			},
 		}
 		h := handler.NewCommentHandler(&server.Server{}, fake)

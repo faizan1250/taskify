@@ -403,6 +403,50 @@ func TestTodoRepository_UpdateTodo(t *testing.T) {
 	})
 }
 
+func TestTodoRepository_UpdateTodo_ReminderFlagsResetOnlyOnDueDateChange(t *testing.T) {
+	_, testServer, cleanup := testing_pkg.SetupTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	todoRepo := repository.NewTodoRepository(testServer)
+
+	userID := uuid.New().String()
+	testTodo := createTestTodo(t, ctx, todoRepo, userID)
+	require.NotNil(t, testTodo.DueDate)
+
+	// Simulate already-sent reminders.
+	require.NoError(t, todoRepo.MarkDueDateReminderSent(ctx, testTodo.ID))
+	require.NoError(t, todoRepo.MarkOverdueNotificationSent(ctx, testTodo.ID))
+
+	t.Run("same due date preserves reminder flags", func(t *testing.T) {
+		sameDueDate := *testTodo.DueDate
+		result, err := todoRepo.UpdateTodo(ctx, userID, &todo.UpdateTodoPayload{
+			ID:      testTodo.ID,
+			DueDate: &sameDueDate,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.NotNil(t, result.ReminderSentAt, "reminder flags must survive a no-op due date update")
+		assert.NotNil(t, result.OverdueNotifiedAt, "reminder flags must survive a no-op due date update")
+	})
+
+	t.Run("changed due date resets reminder flags", func(t *testing.T) {
+		newDueDate := testTodo.DueDate.Add(48 * time.Hour)
+		result, err := todoRepo.UpdateTodo(ctx, userID, &todo.UpdateTodoPayload{
+			ID:      testTodo.ID,
+			DueDate: &newDueDate,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		require.NotNil(t, result.DueDate)
+		assert.True(t, result.DueDate.Equal(newDueDate))
+		assert.Nil(t, result.ReminderSentAt, "reminder flags must reset when the due date changes")
+		assert.Nil(t, result.OverdueNotifiedAt, "reminder flags must reset when the due date changes")
+	})
+}
+
 func TestTodoRepository_DeleteTodo(t *testing.T) {
 	_, testServer, cleanup := testing_pkg.SetupTest(t)
 	defer cleanup()

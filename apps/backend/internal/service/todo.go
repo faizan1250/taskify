@@ -313,6 +313,26 @@ func (s *TodoService) BulkDeleteTodos(ctx echo.Context, userID string, payload *
 	return result, nil
 }
 
+// ReorderTodos persists a drag order. Ownership is enforced per row inside
+// the repository transaction: any foreign or missing ID aborts the batch
+// with a 404 and no partial order is written.
+func (s *TodoService) ReorderTodos(ctx echo.Context, userID string, payload *todo.ReorderTodosPayload) ([]todo.Todo, error) {
+	logger := middleware.GetLogger(ctx)
+
+	result, err := s.todoRepo.ReorderTodos(ctx.Request().Context(), userID, payload.OrderedIDs)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to reorder todos")
+		return nil, err
+	}
+
+	middleware.GetLogger(ctx).Info().
+		Str("event", "todos_reordered").
+		Int("count", len(result)).
+		Msg("Todos reordered")
+
+	return result, nil
+}
+
 // s3DeleteMaxAttempts bounds async S3 delete retries so a transient
 // failure does not permanently orphan an object.
 const s3DeleteMaxAttempts = 3

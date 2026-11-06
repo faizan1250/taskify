@@ -127,6 +127,23 @@ func (h *TodoHandler) BulkDeleteTodos(c echo.Context) error {
 	return c.JSON(status, result)
 }
 
+// ReorderTodos persists a drag order. Returns 200 with the reordered todos
+// in the caller-supplied order. Binds manually instead of Handle() to mirror
+// the bulk handlers; validation still flows through BindAndValidate, so
+// malformed payloads return 400 identically.
+func (h *TodoHandler) ReorderTodos(c echo.Context) error {
+	payload := &todo.ReorderTodosPayload{}
+	if err := validation.BindAndValidate(c, payload); err != nil {
+		return err
+	}
+	userID := middleware.GetUserID(c)
+	result, err := h.todoService.ReorderTodos(c, userID, payload)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, result)
+}
+
 func (h *TodoHandler) GetTodoStats(c echo.Context) error {
 	return Handle(
 		h.Handler,

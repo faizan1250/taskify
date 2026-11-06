@@ -49,6 +49,7 @@ type FakeTodoRepository struct {
 	UploadTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, userID string, s3Key string, fileName string, fileSize int64, mimeType string) (*todo.TodoAttachment, error)
 	GetDueRecurringTodosFn                func(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
 	MaterializeRecurringTodosFn           func(ctx context.Context, now time.Time, limit int) (int, error)
+	ReorderTodosFn                        func(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error)
 }
 
 var _ repository.TodoRepositoryInterface = (*FakeTodoRepository)(nil)
@@ -203,6 +204,13 @@ func (f *FakeTodoRepository) MaterializeRecurringTodos(ctx context.Context, now 
 		return 0, errFake
 	}
 	return f.MaterializeRecurringTodosFn(ctx, now, limit)
+}
+
+func (f *FakeTodoRepository) ReorderTodos(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error) {
+	if f.ReorderTodosFn == nil {
+		return nil, errFake
+	}
+	return f.ReorderTodosFn(ctx, userID, orderedIDs)
 }
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@ type TodoServiceInterface interface {
 	GetTodos(ctx echo.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
 	UpdateTodo(ctx echo.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
 	DeleteTodo(ctx echo.Context, userID string, todoID uuid.UUID) error
+	ReorderTodos(ctx echo.Context, userID string, payload *todo.ReorderTodosPayload) ([]todo.Todo, error)
 	CleanupS3AttachmentsAsync(reqCtx context.Context, keys []string)
 	GetTodoStats(ctx echo.Context, userID string) (*todo.TodoStats, error)
 	UploadTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)

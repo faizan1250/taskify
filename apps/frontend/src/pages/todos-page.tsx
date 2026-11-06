@@ -5,6 +5,7 @@ import {
   type TGetTodosQuery,
 } from "@/api/hooks/use-todo-query";
 import { ShortcutHint } from "@/components/command-palette";
+import { QueryErrorState } from "@/components/query-error-state";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
 import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
@@ -86,7 +87,13 @@ export function TodosPage() {
   const dueRangeInvalid =
     dueFrom !== null && dueTo !== null && dueFrom > dueTo;
 
-  const { data: todos, isLoading } = useGetAllTodos({
+  const {
+    data: todos,
+    isLoading,
+    isError: todosError,
+    isFetching: todosFetching,
+    refetch: refetchTodos,
+  } = useGetAllTodos({
     query: {
       page,
       limit: 20,
@@ -260,7 +267,9 @@ export function TodosPage() {
             >
               {isLoading
                 ? "Loading tasks…"
-                : `${todos?.total ?? 0} result${todos?.total === 1 ? "" : "s"}`}
+                : `${todos?.total ?? 0} result${todos?.total === 1 ? "" : "s"}${
+                    todosFetching ? " · Updating…" : ""
+                  }`}
             </p>
           </CardHeader>
           <CollapsibleContent>
@@ -527,6 +536,14 @@ export function TodosPage() {
 
           {/* Todo List */}
           <div className="space-y-3">
+            {todosError && (todos?.data?.length ?? 0) > 0 && (
+              <QueryErrorState
+                variant="banner"
+                title="Couldn't refresh tasks — showing last loaded results."
+                onRetry={() => void refetchTodos()}
+                isRetrying={todosFetching}
+              />
+            )}
             {isLoading ? (
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -544,6 +561,13 @@ export function TodosPage() {
                   </Card>
                 ))}
               </div>
+            ) : todosError ? (
+              <QueryErrorState
+                title="Couldn't load tasks"
+                description="Check your connection and try again — your filters are kept."
+                onRetry={() => void refetchTodos()}
+                isRetrying={todosFetching}
+              />
             ) : todos?.data?.length ? (
               <>
                 {/* Select All Option */}

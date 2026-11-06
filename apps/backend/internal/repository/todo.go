@@ -528,14 +528,18 @@ func (r *TodoRepository) GetTodoStats(ctx context.Context, userID string, includ
 			user_id=@user_id
 	`
 
-	rows, err := r.server.DB.Pool.Query(ctx, stmt, pgx.NamedArgs{
+	var stats todo.TodoStats
+	err := r.server.DB.Pool.QueryRow(ctx, stmt, pgx.NamedArgs{
 		"user_id": userID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute query: %w", err)
-	}
-
-	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[todo.TodoStats])
+	}).Scan(
+		&stats.Total,
+		&stats.Draft,
+		&stats.Active,
+		&stats.Completed,
+		&stats.Archived,
+		&stats.Overdue,
+		&stats.DueThisWeek,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect row from table:todos: %w", err)
 	}

@@ -219,6 +219,19 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "recurrence",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "daily",
+                "weekly",
+                "monthly"
+              ]
+            }
           }
         ],
         "operationId": "getTodos",
@@ -272,6 +285,20 @@
                           },
                           "completedAt": {
                             "type": "string",
+                            "nullable": true
+                          },
+                          "recurrence": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "daily",
+                              "weekly",
+                              "monthly"
+                            ]
+                          },
+                          "nextRunAt": {
+                            "type": "string",
+                            "format": "date-time",
                             "nullable": true
                           },
                           "parentTodoId": {
@@ -396,6 +423,20 @@
                                   "type": "string",
                                   "nullable": true
                                 },
+                                "recurrence": {
+                                  "type": "string",
+                                  "enum": [
+                                    "none",
+                                    "daily",
+                                    "weekly",
+                                    "monthly"
+                                  ]
+                                },
+                                "nextRunAt": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "nullable": true
+                                },
                                 "parentTodoId": {
                                   "type": "string",
                                   "format": "uuid",
@@ -446,6 +487,8 @@
                                 "priority",
                                 "dueDate",
                                 "completedAt",
+                                "recurrence",
+                                "nextRunAt",
                                 "parentTodoId",
                                 "categoryId",
                                 "metadata",
@@ -551,6 +594,8 @@
                           "priority",
                           "dueDate",
                           "completedAt",
+                          "recurrence",
+                          "nextRunAt",
                           "parentTodoId",
                           "categoryId",
                           "metadata",
@@ -628,6 +673,15 @@
                   "dueDate": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "recurrence": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "daily",
+                      "weekly",
+                      "monthly"
+                    ]
                   },
                   "parentTodoId": {
                     "type": "string",
@@ -715,6 +769,20 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "recurrence": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "daily",
+                        "weekly",
+                        "monthly"
+                      ]
+                    },
+                    "nextRunAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
                     "parentTodoId": {
                       "type": "string",
                       "format": "uuid",
@@ -765,6 +833,8 @@
                     "priority",
                     "dueDate",
                     "completedAt",
+                    "recurrence",
+                    "nextRunAt",
                     "parentTodoId",
                     "categoryId",
                     "metadata",
@@ -847,6 +917,20 @@
                     },
                     "completedAt": {
                       "type": "string",
+                      "nullable": true
+                    },
+                    "recurrence": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "daily",
+                        "weekly",
+                        "monthly"
+                      ]
+                    },
+                    "nextRunAt": {
+                      "type": "string",
+                      "format": "date-time",
                       "nullable": true
                     },
                     "parentTodoId": {
@@ -971,6 +1055,20 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "recurrence": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "daily",
+                              "weekly",
+                              "monthly"
+                            ]
+                          },
+                          "nextRunAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
                           "parentTodoId": {
                             "type": "string",
                             "format": "uuid",
@@ -1021,6 +1119,8 @@
                           "priority",
                           "dueDate",
                           "completedAt",
+                          "recurrence",
+                          "nextRunAt",
                           "parentTodoId",
                           "categoryId",
                           "metadata",
@@ -1126,6 +1226,8 @@
                     "priority",
                     "dueDate",
                     "completedAt",
+                    "recurrence",
+                    "nextRunAt",
                     "parentTodoId",
                     "categoryId",
                     "metadata",
@@ -1199,6 +1301,15 @@
                   "dueDate": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "recurrence": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "daily",
+                      "weekly",
+                      "monthly"
+                    ]
                   },
                   "parentTodoId": {
                     "type": "string",
@@ -1283,6 +1394,20 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "recurrence": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "daily",
+                        "weekly",
+                        "monthly"
+                      ]
+                    },
+                    "nextRunAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true
+                    },
                     "parentTodoId": {
                       "type": "string",
                       "format": "uuid",
@@ -1333,6 +1458,8 @@
                     "priority",
                     "dueDate",
                     "completedAt",
+                    "recurrence",
+                    "nextRunAt",
                     "parentTodoId",
                     "categoryId",
                     "metadata",

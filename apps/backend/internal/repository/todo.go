@@ -34,7 +34,9 @@ func (r *TodoRepository) CreateTodo(ctx context.Context, userID string, payload 
 				due_date,
 				parent_todo_id,
 				category_id,
-				metadata
+				metadata,
+				recurrence,
+				next_run_at
 			)
 		VALUES
 			(
@@ -45,7 +47,9 @@ func (r *TodoRepository) CreateTodo(ctx context.Context, userID string, payload 
 				@due_date,
 				@parent_todo_id,
 				@category_id,
-				@metadata
+				@metadata,
+				@recurrence,
+				@next_run_at
 			)
 		RETURNING
 		*
@@ -54,6 +58,14 @@ func (r *TodoRepository) CreateTodo(ctx context.Context, userID string, payload 
 	if payload.Priority != nil {
 		priority = *payload.Priority
 	}
+
+	// next_run_at is server-derived, never client-supplied: the first
+	// occurrence fires at the due date when set, otherwise one step out.
+	recurrence := todo.RecurrenceNone
+	if payload.Recurrence != nil {
+		recurrence = *payload.Recurrence
+	}
+	nextRunAt := todo.ResolveNextRun(recurrence, payload.DueDate, time.Now())
 
 	rows, err := r.server.DB.Pool.Query(ctx, stmt, pgx.NamedArgs{
 		"user_id":        userID,
@@ -64,6 +76,8 @@ func (r *TodoRepository) CreateTodo(ctx context.Context, userID string, payload 
 		"parent_todo_id": payload.ParentTodoID,
 		"category_id":    payload.CategoryID,
 		"metadata":       payload.Metadata,
+		"recurrence":     recurrence,
+		"next_run_at":    nextRunAt,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute create todo query for user_id=%s title=%s: %w", userID, payload.Title, err)
@@ -265,6 +279,11 @@ func (r *TodoRepository) GetTodos(ctx context.Context, userID string, query *tod
 		}
 	}
 
+	if query.Recurrence != nil {
+		conditions = append(conditions, "t.recurrence = @recurrence")
+		args["recurrence"] = *query.Recurrence
+	}
+
 	if query.Search != nil {
 		conditions = append(conditions, "(t.title ILIKE @search OR t.description ILIKE @search)")
 		args["search"] = "%" + *query.Search + "%"
@@ -374,6 +393,37 @@ func (r *TodoRepository) UpdateTodo(ctx context.Context, userID string, payload 
 		if existing.DueDate == nil || !existing.DueDate.Equal(*payload.DueDate) {
 			setClauses = append(setClauses, "reminder_sent_at = NULL", "overdue_notified_at = NULL")
 		}
+
+		// A recurring template's schedule follows its due date: moving the
+		// due date re-points the next run instead of leaving a stale slot.
+		recurrence := existing.Recurrence
+		if payload.Recurrence != nil {
+			recurrence = *payload.Recurrence
+			setClauses = append(setClauses, "recurrence = @recurrence")
+			args["recurrence"] = *payload.Recurrence
+		}
+		if recurrence.IsRecurring() {
+			setClauses = append(setClauses, "next_run_at = @next_run_at")
+			args["next_run_at"] = todo.ResolveNextRun(recurrence, payload.DueDate, time.Now())
+		}
+	}
+
+	if payload.Recurrence != nil && payload.DueDate == nil {
+		setClauses = append(setClauses, "recurrence = @recurrence")
+		args["recurrence"] = *payload.Recurrence
+
+		// The rule changed but the due date did not: anchor the new
+		// schedule at the stored due date (nil clears next_run_at via
+		// ResolveNextRun when the rule is none).
+		existing, err := r.CheckTodoExists(ctx, userID, payload.ID)
+		if err != nil {
+			return nil, err
+		}
+		setClauses = append(setClauses, "next_run_at = @next_run_at")
+		args["next_run_at"] = todo.ResolveNextRun(*payload.Recurrence, existing.DueDate, time.Now())
+	} else if payload.Recurrence != nil {
+		setClauses = append(setClauses, "recurrence = @recurrence")
+		args["recurrence"] = *payload.Recurrence
 	}
 
 	if payload.ParentTodoID != nil {
@@ -1190,4 +1240,171 @@ func (r *TodoRepository) BulkDeleteTodos(ctx context.Context, userID string, ids
 	}
 
 	return result, nil
+}
+
+// GetDueRecurringTodos returns up to limit recurring templates whose
+// next_run_at has passed. Completed and archived templates never fire:
+// completing a template pauses its schedule until it is reactivated.
+func (r *TodoRepository) GetDueRecurringTodos(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error) {
+	stmt := `
+		SELECT
+			*
+		FROM
+			todos
+		WHERE
+			recurrence <> 'none'
+			AND next_run_at IS NOT NULL
+			AND next_run_at <= @now
+			AND status NOT IN ('completed', 'archived')
+		ORDER BY
+			next_run_at ASC
+		LIMIT
+			@limit
+	`
+
+	rows, err := r.server.DB.Pool.Query(ctx, stmt, pgx.NamedArgs{
+		"now":   now,
+		"limit": limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute get due recurring todos query: %w", err)
+	}
+
+	todos, err := pgx.CollectRows(rows, pgx.RowToStructByName[todo.Todo])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return []todo.Todo{}, nil
+		}
+		return nil, fmt.Errorf("failed to collect rows from table:todos: %w", err)
+	}
+
+	return todos, nil
+}
+
+// MaterializeRecurringTodos spawns one plain occurrence per due recurring
+// template and advances each template to its following slot, all inside a
+// single transaction. Rows are locked with FOR UPDATE SKIP LOCKED so two
+// concurrent cron instances never materialize the same slot twice.
+//
+// Catch-up policy: a template far behind schedule (cron was down for
+// weeks) yields exactly one occurrence per run and converges over
+// successive runs, instead of flooding the user with a burst of backdated
+// todos. Occurrences are standalone leaves: subtasks are not cloned and
+// the copy itself never recurs. Templates with an unrecognized rule are
+// self-healed to none rather than retried forever.
+func (r *TodoRepository) MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error) {
+	tx, err := r.server.DB.Pool.Begin(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to begin materialize recurring transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	selectStmt := `
+		SELECT
+			*
+		FROM
+			todos
+		WHERE
+			recurrence <> 'none'
+			AND next_run_at IS NOT NULL
+			AND next_run_at <= @now
+			AND status NOT IN ('completed', 'archived')
+		ORDER BY
+			next_run_at ASC
+		LIMIT
+			@limit
+		FOR UPDATE SKIP LOCKED
+	`
+
+	rows, err := tx.Query(ctx, selectStmt, pgx.NamedArgs{
+		"now":   now,
+		"limit": limit,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("failed to select due recurring todos: %w", err)
+	}
+
+	templates, err := pgx.CollectRows(rows, pgx.RowToStructByName[todo.Todo])
+	if err != nil {
+		return 0, fmt.Errorf("failed to collect due recurring todos: %w", err)
+	}
+
+	insertStmt := `
+		INSERT INTO
+			todos (
+				user_id,
+				title,
+				description,
+				status,
+				priority,
+				due_date,
+				category_id,
+				metadata,
+				recurrence,
+				next_run_at
+			)
+		VALUES
+			(
+				@user_id,
+				@title,
+				@description,
+				@status,
+				@priority,
+				@due_date,
+				@category_id,
+				@metadata,
+				'none',
+				NULL
+			)
+	`
+
+	materialized := 0
+	for _, template := range templates {
+		if template.NextRunAt == nil {
+			continue
+		}
+		next, ok := todo.NextOccurrence(*template.NextRunAt, template.Recurrence)
+		if !ok {
+			// Unrecognized rule (predates the CHECK constraint or a
+			// rolled-back deploy): stop the schedule, keep the row.
+			_, err := tx.Exec(ctx, `UPDATE todos SET recurrence = 'none', next_run_at = NULL WHERE id = @id`,
+				pgx.NamedArgs{"id": template.ID})
+			if err != nil {
+				return 0, fmt.Errorf("failed to heal unrecognized recurrence for todo_id=%s: %w", template.ID.String(), err)
+			}
+			continue
+		}
+
+		_, err := tx.Exec(ctx, insertStmt, pgx.NamedArgs{
+			"user_id":     template.UserID,
+			"title":       template.Title,
+			"description": template.Description,
+			"status":      template.Status,
+			"priority":    template.Priority,
+			"due_date":    template.NextRunAt,
+			"category_id": template.CategoryID,
+			"metadata":    template.Metadata,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("failed to insert recurring occurrence for todo_id=%s: %w", template.ID.String(), err)
+		}
+
+		_, err = tx.Exec(ctx, `UPDATE todos SET next_run_at = @next_run_at WHERE id = @id`, pgx.NamedArgs{
+			"id":          template.ID,
+			"next_run_at": next,
+		})
+		if err != nil {
+			return 0, fmt.Errorf("failed to advance recurring schedule for todo_id=%s: %w", template.ID.String(), err)
+		}
+
+		materialized++
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, fmt.Errorf("failed to commit materialize recurring transaction: %w", err)
+	}
+
+	return materialized, nil
 }

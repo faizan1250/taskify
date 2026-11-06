@@ -36,6 +36,8 @@ type TodoRepositoryInterface interface {
 	MarkDueDateReminderSent(ctx context.Context, todoID uuid.UUID) error
 	MarkOverdueNotificationSent(ctx context.Context, todoID uuid.UUID) error
 	GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error)
+	GetDueRecurringTodos(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
+	MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error)
 }
 
 type CategoryRepositoryInterface interface {

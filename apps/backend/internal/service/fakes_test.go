@@ -47,6 +47,8 @@ type FakeTodoRepository struct {
 	DeleteTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentKeysForTodoAndSubtasksFn func(ctx context.Context, userID string, todoID uuid.UUID) ([]string, error)
 	UploadTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, userID string, s3Key string, fileName string, fileSize int64, mimeType string) (*todo.TodoAttachment, error)
+	GetDueRecurringTodosFn                func(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
+	MaterializeRecurringTodosFn           func(ctx context.Context, now time.Time, limit int) (int, error)
 }
 
 var _ repository.TodoRepositoryInterface = (*FakeTodoRepository)(nil)
@@ -187,6 +189,20 @@ func (f *FakeTodoRepository) MarkOverdueNotificationSent(ctx context.Context, to
 
 func (f *FakeTodoRepository) GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error) {
 	return "", errFake
+}
+
+func (f *FakeTodoRepository) GetDueRecurringTodos(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error) {
+	if f.GetDueRecurringTodosFn == nil {
+		return nil, errFake
+	}
+	return f.GetDueRecurringTodosFn(ctx, now, limit)
+}
+
+func (f *FakeTodoRepository) MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error) {
+	if f.MaterializeRecurringTodosFn == nil {
+		return 0, errFake
+	}
+	return f.MaterializeRecurringTodosFn(ctx, now, limit)
 }
 
 // ---------------------------------------------------------------------------

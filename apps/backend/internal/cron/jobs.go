@@ -252,6 +252,44 @@ func (j *WeeklyReportsJob) Run(ctx context.Context, jobCtx *JobContext) error {
 
 // --------
 
+type RecurringTodosJob struct{}
+
+func (j *RecurringTodosJob) Name() string {
+	return "recurring-todos"
+}
+
+func (j *RecurringTodosJob) Description() string {
+	return "Materialize next occurrence for due recurring todos"
+}
+
+// recurringMaterializer is the repository subset the job needs. Narrowing
+// to an interface keeps the orchestration Docker-free testable with a stub
+// instead of a live database.
+type recurringMaterializer interface {
+	MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error)
+}
+
+// materializeDueRecurring runs one materialization pass against store and
+// returns how many occurrences were spawned.
+func materializeDueRecurring(ctx context.Context, store recurringMaterializer, now time.Time, limit int) (int, error) {
+	return store.MaterializeRecurringTodos(ctx, now, limit)
+}
+
+func (j *RecurringTodosJob) Run(ctx context.Context, jobCtx *JobContext) error {
+	count, err := materializeDueRecurring(ctx, jobCtx.Repositories.Todo, time.Now(), jobCtx.Config.Cron.BatchSize)
+	if err != nil {
+		return err
+	}
+
+	jobCtx.Server.Logger.Info().
+		Int("materialized_count", count).
+		Msg("Recurring todos materialized")
+
+	return nil
+}
+
+// --------
+
 type AutoArchiveJob struct{}
 
 func (j *AutoArchiveJob) Name() string {

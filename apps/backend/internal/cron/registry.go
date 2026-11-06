@@ -18,6 +18,7 @@ func NewJobRegistry() *JobRegistry {
 	registry.Register(&OverdueNotificationsJob{})
 	registry.Register(&WeeklyReportsJob{})
 	registry.Register(&AutoArchiveJob{})
+	registry.Register(&RecurringTodosJob{})
 
 	return registry
 }

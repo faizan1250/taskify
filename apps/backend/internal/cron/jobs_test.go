@@ -62,6 +62,7 @@ func TestJobRegistry(t *testing.T) {
 		"overdue-notifications",
 		"weekly-reports",
 		"auto-archive",
+		"recurring-todos",
 	}
 
 	for _, expected := range expectedJobs {
@@ -100,6 +101,10 @@ func TestDistributedLockKeyNaming(t *testing.T) {
 		{
 			jobName:     "auto-archive",
 			expectedKey: "cron:lock:auto-archive",
+		},
+		{
+			jobName:     "recurring-todos",
+			expectedKey: "cron:lock:recurring-todos",
 		},
 	}
 

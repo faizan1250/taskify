@@ -174,7 +174,7 @@ export function TodoDetailDrawer() {
         {taskId === null ? null : isLoading ? (
           <DrawerSkeleton />
         ) : todo === null || isNotFound ? (
-          <DrawerNotFound taskId={taskId} />
+          <DrawerNotFound taskId={taskId} onClose={close} />
         ) : (
           <DrawerBody
             key={taskId}
@@ -201,8 +201,13 @@ export function TodoDetailDrawer() {
 
 function DrawerSkeleton() {
   return (
-    <div className="space-y-4 p-4 pt-12">
-      <div className="flex items-center gap-3">
+    <div
+      className="space-y-4 p-4 pt-12"
+      role="status"
+      aria-label="Loading task details"
+    >
+      <span className="sr-only">Loading task details…</span>
+      <div className="flex items-center gap-3" aria-hidden="true">
         <Skeleton className="h-5 w-5 rounded" />
         <Skeleton className="h-6 flex-1" />
       </div>
@@ -217,7 +222,13 @@ function DrawerSkeleton() {
   );
 }
 
-function DrawerNotFound({ taskId }: { taskId: string }) {
+function DrawerNotFound({
+  taskId,
+  onClose,
+}: {
+  taskId: string;
+  onClose: () => void;
+}) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
       <FileWarning className="h-12 w-12 text-muted-foreground opacity-50" />
@@ -226,6 +237,9 @@ function DrawerNotFound({ taskId }: { taskId: string }) {
         No task with id <span className="font-mono text-xs">{taskId}</span>{" "}
         exists. It may have been deleted, or the link is stale.
       </p>
+      <Button type="button" variant="outline" size="sm" onClick={onClose}>
+        Back to tasks
+      </Button>
     </div>
   );
 }
@@ -314,7 +328,7 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
               />
               {statusMeta[todo.status].label}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-xs tabular-nums text-muted-foreground">
               Updated {new Date(todo.updatedAt).toLocaleString()}
             </p>
           </div>
@@ -355,7 +369,7 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
             <TabsTrigger value="subtasks">
               Subtasks
               {subtasks.length > 0 && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {completedSubtasks}/{subtasks.length}
                 </span>
               )}
@@ -363,7 +377,7 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
             <TabsTrigger value="comments">
               Comments
               {commentCount > 0 && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {commentCount}
                 </span>
               )}
@@ -372,7 +386,7 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
               <Paperclip className="h-3.5 w-3.5" />
               Files
               {attachmentCount > 0 && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {attachmentCount}
                 </span>
               )}
@@ -380,19 +394,13 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
           </TabsList>
         </div>
 
-        <TabsContent
-          value="details"
-          className="min-h-0 flex-1 overflow-y-auto"
-        >
+        <TabsContent value="details" className="min-h-0 flex-1">
           <ScrollArea className="h-full">
             <DetailsTab todo={todo} titleRef={titleRef} />
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent
-          value="subtasks"
-          className="min-h-0 flex-1 overflow-y-auto"
-        >
+        <TabsContent value="subtasks" className="min-h-0 flex-1">
           <ScrollArea className="h-full">
             <SubtasksTab todo={todo} />
           </ScrollArea>
@@ -407,7 +415,7 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
 
         <TabsContent
           value="attachments"
-          className="min-h-0 flex-1 overflow-y-auto"
+          className="min-h-0 flex-1"
         >
           <ScrollArea className="h-full">
             <AttachmentsTab todo={todo} />
@@ -460,18 +468,27 @@ function DetailsTab({
   };
 
   return (
-    <div className="space-y-4 p-4">
+    <div className="space-y-4 p-4" aria-busy={saving}>
       <div className="space-y-1.5">
-        <Label htmlFor="drawer-title">
-          Title{" "}
-          <span className="font-normal text-muted-foreground">
-            — press{" "}
-            <kbd className="rounded border bg-muted px-1 font-sans text-[11px]">
-              E
-            </kbd>{" "}
-            to edit
+        <div className="flex items-center justify-between gap-2">
+          <Label htmlFor="drawer-title">
+            Title{" "}
+            <span className="font-normal text-muted-foreground">
+              — press{" "}
+              <kbd className="rounded border bg-muted px-1 font-sans text-[11px]">
+                E
+              </kbd>{" "}
+              to edit
+            </span>
+          </Label>
+          <span
+            role="status"
+            aria-live="polite"
+            className="shrink-0 text-[11px] tabular-nums text-muted-foreground"
+          >
+            {saving ? "Saving…" : ""}
           </span>
-        </Label>
+        </div>
         <Input
           id="drawer-title"
           ref={titleRef}
@@ -596,7 +613,7 @@ function DetailsTab({
         />
       </div>
 
-      <dl className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
+      <dl className="space-y-1 border-t pt-3 text-xs tabular-nums text-muted-foreground">
         <div className="flex justify-between">
           <dt>Created</dt>
           <dd>{new Date(todo.createdAt).toLocaleString()}</dd>

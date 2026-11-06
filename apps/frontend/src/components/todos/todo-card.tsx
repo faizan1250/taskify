@@ -179,7 +179,7 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
     <>
       <Card
         className={cn(
-          "transition-all hover:shadow-md",
+          "transition-colors",
           todo.status === "completed" && "opacity-75",
           compact &&
             "shadow-none border-0 border-l-2 border-l-transparent hover:border-l-primary",
@@ -194,6 +194,7 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
                   checked={todo.status === "completed"}
                   onCheckedChange={handleStatusToggle}
                   disabled={updateTodo.isPending}
+                  aria-label={`Mark ${todo.title} as ${todo.status === "completed" ? "active" : "completed"}`}
                   className="mt-0.5"
                 />
                 <div className="flex-1 min-w-0">

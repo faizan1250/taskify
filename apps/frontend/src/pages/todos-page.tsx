@@ -6,6 +6,7 @@ import {
 } from "@/api/hooks/use-todo-query";
 import { ShortcutHint } from "@/components/command-palette";
 import { QueryErrorState } from "@/components/query-error-state";
+import { BulkActionsBar } from "@/components/todos/bulk-actions-bar";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
 import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
@@ -178,6 +179,23 @@ export function TodosPage() {
       setSelectedTodos([]);
     }
   };
+
+  const handleBulkResolve = (succeededIds: string[]) => {
+    if (succeededIds.length === 0) return;
+    const succeeded = new Set(succeededIds);
+    setSelectedTodos((prev) => prev.filter((id) => !succeeded.has(id)));
+  };
+
+  // Selection is page-scoped: drop ids that are no longer visible so the
+  // count never refers to rows on another page, filter, or deleted tasks.
+  const visibleIdsKey = (todos?.data ?? []).map((todo) => todo.id).join(",");
+  useEffect(() => {
+    setSelectedTodos((prev) => {
+      const visible = new Set(visibleIdsKey.split(",").filter(Boolean));
+      const pruned = prev.filter((id) => visible.has(id));
+      return pruned.length === prev.length ? prev : pruned;
+    });
+  }, [visibleIdsKey]);
 
   const tabCounts = {
     all: stats?.total || 0,
@@ -515,23 +533,15 @@ export function TodosPage() {
         </TabsList>
 
         <TabsContent value={tab} className="space-y-4">
-          {/* Bulk Actions */}
-          {selectedTodos.length > 0 && (
-            <Card>
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      checked={selectedTodos.length === todos?.data?.length}
-                      onCheckedChange={handleSelectAll}
-                    />
-                    <span className="text-sm font-medium">
-                      {selectedTodos.length} selected
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Bulk Actions — the single select-all + bulk surface */}
+          {(todos?.data?.length ?? 0) > 0 && !isLoading && (
+            <BulkActionsBar
+              selectedIds={selectedTodos}
+              totalOnPage={todos?.data?.length ?? 0}
+              onToggleSelectAll={handleSelectAll}
+              onResolve={handleBulkResolve}
+              onClear={() => setSelectedTodos([])}
+            />
           )}
 
           {/* Todo List */}
@@ -570,23 +580,6 @@ export function TodosPage() {
               />
             ) : todos?.data?.length ? (
               <>
-                {/* Select All Option */}
-                {todos.data.length > 1 && (
-                  <Card>
-                    <CardContent className="py-3">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          checked={selectedTodos.length === todos.data.length}
-                          onCheckedChange={handleSelectAll}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          Select all {todos.data.length} tasks
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 {todos.data.map((todo, index) => (
                   <div
                     key={todo.id}
@@ -604,6 +597,7 @@ export function TodosPage() {
                         onCheckedChange={(checked) =>
                           handleSelectTodo(todo.id, checked as boolean)
                         }
+                        aria-label={`Select task ${todo.title}`}
                       />
                     </div>
                     <div className="flex-1">

@@ -8,6 +8,10 @@ import { ShortcutHint } from "@/components/command-palette";
 import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
 import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
+import {
+  TodosFilteredEmptyState,
+  TodosFirstRunEmptyState,
+} from "@/components/todos/todos-empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +45,7 @@ import { useSavedViews } from "@/hooks/use-saved-views";
 import { useTodosFilterChips } from "@/hooks/use-todos-filter-chips";
 import { useTodosHotkeys } from "@/hooks/use-todos-hotkeys";
 import { cn } from "@/lib/utils";
-import { Plus, Search, CheckSquare, ChevronDown, X } from "lucide-react";
+import { Plus, Search, ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export function TodosPage() {
@@ -612,26 +616,21 @@ export function TodosPage() {
                   </div>
                 )}
               </>
+            ) : hasActiveFilters ? (
+              <TodosFilteredEmptyState
+                tabLabel={
+                  tab === "all"
+                    ? null
+                    : tab.charAt(0).toUpperCase() + tab.slice(1)
+                }
+                filters={chips}
+                hasSearch={debouncedSearch !== ""}
+                hasDueRange={dueFrom !== null || dueTo !== null}
+                hasOverdueOnly={overdueOnly}
+                onClearAll={clearFilters}
+              />
             ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <CheckSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <h3 className="text-lg font-medium mb-2">No tasks found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    {hasActiveFilters
-                      ? "Try adjusting your filters or search terms."
-                      : "Create your first task to get started!"}
-                  </p>
-                  {!hasActiveFilters && (
-                    <TodoCreateForm>
-                      <Button>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create Task
-                      </Button>
-                    </TodoCreateForm>
-                  )}
-                </CardContent>
-              </Card>
+              <TodosFirstRunEmptyState />
             )}
           </div>
           {/* Keyboard hints */}

@@ -26,6 +26,10 @@ func registerTodoRoutes(r *echo.Group, h *handler.TodoHandler, ch *handler.Comme
 	dynamicTodo.PATCH("", h.UpdateTodo)
 	dynamicTodo.DELETE("", h.DeleteTodo)
 
+	// Todo sharing (bearer capability tokens)
+	dynamicTodo.POST("/share", h.ShareTodo)
+	dynamicTodo.DELETE("/share", h.UnshareTodo)
+
 	// Todo comments
 	todoComments := dynamicTodo.Group("/comments")
 	todoComments.POST("", ch.AddComment)

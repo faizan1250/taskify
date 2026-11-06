@@ -39,6 +39,9 @@ type TodoRepositoryInterface interface {
 	GetDueRecurringTodos(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
 	MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error)
 	ReorderTodos(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error)
+	CreateShareToken(ctx context.Context, userID string, todoID uuid.UUID) (*todo.TodoShareToken, error)
+	GetSharedTodo(ctx context.Context, token string) (*todo.PopulatedTodo, error)
+	RevokeShareTokensForTodo(ctx context.Context, userID string, todoID uuid.UUID) error
 }
 
 type CategoryRepositoryInterface interface {

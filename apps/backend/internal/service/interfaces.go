@@ -24,6 +24,9 @@ type TodoServiceInterface interface {
 	UploadTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
 	DeleteTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentPresignedURL(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) (string, error)
+	ShareTodo(ctx echo.Context, userID string, todoID uuid.UUID) (*todo.ShareTodoResult, error)
+	GetSharedTodo(ctx echo.Context, token string) (*todo.PopulatedTodo, error)
+	UnshareTodo(ctx echo.Context, userID string, todoID uuid.UUID) error
 }
 
 type CategoryServiceInterface interface {

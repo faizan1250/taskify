@@ -7,6 +7,10 @@ import (
 )
 
 func RegisterV1Routes(router *echo.Group, handlers *handler.Handlers, middleware *middleware.Middlewares) {
+	// Public shared-todo read: token possession is the authorization, so this
+	// route intentionally sits outside RequireAuth.
+	router.GET("/shared/:token", handlers.Todo.GetSharedTodo)
+
 	// Register todo routes
 	registerTodoRoutes(router, handlers.Todo, handlers.Comment, middleware.Auth)
 

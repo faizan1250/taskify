@@ -50,6 +50,9 @@ type FakeTodoRepository struct {
 	GetDueRecurringTodosFn                func(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
 	MaterializeRecurringTodosFn           func(ctx context.Context, now time.Time, limit int) (int, error)
 	ReorderTodosFn                        func(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error)
+	CreateShareTokenFn                    func(ctx context.Context, userID string, todoID uuid.UUID) (*todo.TodoShareToken, error)
+	GetSharedTodoFn                       func(ctx context.Context, token string) (*todo.PopulatedTodo, error)
+	RevokeShareTokensForTodoFn            func(ctx context.Context, userID string, todoID uuid.UUID) error
 }
 
 var _ repository.TodoRepositoryInterface = (*FakeTodoRepository)(nil)
@@ -211,6 +214,27 @@ func (f *FakeTodoRepository) ReorderTodos(ctx context.Context, userID string, or
 		return nil, errFake
 	}
 	return f.ReorderTodosFn(ctx, userID, orderedIDs)
+}
+
+func (f *FakeTodoRepository) CreateShareToken(ctx context.Context, userID string, todoID uuid.UUID) (*todo.TodoShareToken, error) {
+	if f.CreateShareTokenFn == nil {
+		return nil, errFake
+	}
+	return f.CreateShareTokenFn(ctx, userID, todoID)
+}
+
+func (f *FakeTodoRepository) GetSharedTodo(ctx context.Context, token string) (*todo.PopulatedTodo, error) {
+	if f.GetSharedTodoFn == nil {
+		return nil, errFake
+	}
+	return f.GetSharedTodoFn(ctx, token)
+}
+
+func (f *FakeTodoRepository) RevokeShareTokensForTodo(ctx context.Context, userID string, todoID uuid.UUID) error {
+	if f.RevokeShareTokensForTodoFn == nil {
+		return errFake
+	}
+	return f.RevokeShareTokensForTodoFn(ctx, userID, todoID)
 }
 
 // ---------------------------------------------------------------------------

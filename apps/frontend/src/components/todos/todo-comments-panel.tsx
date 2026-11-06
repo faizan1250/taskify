@@ -51,7 +51,11 @@ import {
 import { toast } from "sonner";
 
 const commentSchema = z.object({
-  content: z.string().min(1, "Comment cannot be empty").max(1000, "Comment too long"),
+  content: z
+    .string()
+    .trim()
+    .min(1, "Comment cannot be empty")
+    .max(1000, "Comment too long"),
 });
 
 type CommentForm = z.infer<typeof commentSchema>;
@@ -92,7 +96,13 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
   const [deleteCommentId, setDeleteCommentId] = useState<string | null>(null);
 
   const { user } = useUser();
-  const { data: comments, isLoading } = useGetCommentsByTodoId({ todoId });
+  const {
+    data: comments,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useGetCommentsByTodoId({ todoId });
   const addComment = useAddComment();
   const updateComment = useUpdateComment();
   const deleteComment = useDeleteComment();
@@ -112,11 +122,13 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
   });
 
   const onSubmit = async (data: CommentForm) => {
+    if (addComment.isPending) return;
     await addComment.mutateAsync({
       body: {
         todoId,
-        content: data.content,
+        content: data.content.trim(),
       },
+      userId: user?.id ?? "unknown",
     });
 
     toast.success("Comment added successfully!");
@@ -144,7 +156,7 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
 
   const handleDeleteComment = async (commentId: string) => {
     try {
-      await deleteComment.mutateAsync({ commentId });
+      await deleteComment.mutateAsync({ commentId, todoId });
       toast.success("Comment deleted successfully!");
       setDeleteCommentId(null);
     } catch {
@@ -171,6 +183,13 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
         >
           {/* Comments List */}
           <ScrollArea className="flex-1 pr-4">
+            {!isLoading && !isError && (
+              <p role="status" aria-live="polite" className="sr-only">
+                {comments?.length
+                  ? `${comments.length} comment${comments.length === 1 ? "" : "s"} on this task`
+                  : "No comments on this task"}
+              </p>
+            )}
             <div className="space-y-4">
               {isLoading ? (
                 <div className="space-y-4">
@@ -187,6 +206,24 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              ) : isError ? (
+                <div className="text-center py-8">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
+                  <p className="font-medium">Couldn't load comments</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Check your connection and try again — your comments are safe.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => void refetch()}
+                    disabled={isFetching}
+                  >
+                    {isFetching ? "Retrying…" : "Retry"}
+                  </Button>
                 </div>
               ) : comments?.length ? (
                 comments.map((comment) => {
@@ -226,7 +263,7 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
                             </span>
                           </div>
 
-                          {comment.userId === user?.id && (
+                          {comment.userId === user?.id && !isOptimistic && (
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Comment actions">
@@ -310,8 +347,10 @@ export function TodoCommentsPanel({ todoId }: TodoCommentsPanelProps) {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                  <p>No comments yet.</p>
-                  <p className="text-xs">Be the first to add a comment!</p>
+                  <p className="font-medium text-foreground">No discussion yet</p>
+                  <p className="text-xs mt-1">
+                    Decisions, blockers, and context for this task live here.
+                  </p>
                 </div>
               )}
             </div>

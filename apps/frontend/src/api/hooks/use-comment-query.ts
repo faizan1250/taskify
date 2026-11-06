@@ -118,9 +118,15 @@ export const useAddComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ body }: { body: TAddCommentPayload & { todoId: string } }) =>
-      addComment({ api, todoId: body.todoId, data: body }),
-    onMutate: async ({ body }) => {
+    mutationFn: ({
+      body,
+      userId,
+    }: {
+      body: TAddCommentPayload & { todoId: string };
+      /** Current Clerk user id — stamps the optimistic row so it renders as your own while pending. */
+      userId: string;
+    }) => addComment({ api, todoId: body.todoId, data: body }),
+    onMutate: async ({ body, userId }) => {
       const queryKey = [
         QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID,
         body.todoId,
@@ -131,7 +137,7 @@ export const useAddComment = () => {
       const optimisticComment: TAddCommentResponse = {
         id: `optimistic-${Date.now()}`,
         todoId: body.todoId,
-        userId: "optimistic",
+        userId,
         content: body.content,
         createdAt: now,
         updatedAt: now,
@@ -205,31 +211,26 @@ export const useDeleteComment = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ commentId }: { commentId: string }) =>
-      deleteComment({ api, id: commentId }),
-    onMutate: async ({ commentId }) => {
-      // We need to find which todo this comment belongs to
-      // This is a bit tricky without the todoId, but we can get it from the cache
-      const queryCache = queryClient.getQueryCache();
-      const commentQueries = queryCache.findAll({
-        queryKey: [QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID],
-      });
-
-      let todoId: string | null = null;
-      for (const query of commentQueries) {
-        const comments = query.state.data as
-          | TGetCommentsByTodoIdResponse
-          | undefined;
-        if (comments && Array.isArray(comments)) {
-          const comment = comments.find((c) => c.id === commentId);
-          if (comment) {
-            todoId = comment.todoId;
-            break;
-          }
-        }
-      }
-
-      return { todoId };
+    mutationFn: ({
+      commentId,
+      todoId,
+    }: {
+      commentId: string;
+      todoId: string;
+    }) => deleteComment({ api, id: commentId }),
+    onMutate: async ({ commentId, todoId }) => {
+      const queryKey = [
+        QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID,
+        todoId,
+      ] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const previous =
+        queryClient.getQueryData<TGetCommentsByTodoIdResponse>(queryKey);
+      queryClient.setQueryData<TGetCommentsByTodoIdResponse>(
+        queryKey,
+        (previous ?? []).filter((c) => c.id !== commentId),
+      );
+      return { previous, todoId };
     },
     onSuccess: (_, __, context) => {
       if (context?.todoId) {
@@ -247,7 +248,13 @@ export const useDeleteComment = () => {
         queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
       });
     },
-    onError: (err) => {
+    onError: (err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(
+          [QUERY_KEYS.COMMENTS.GET_COMMENTS_BY_TODO_ID, context.todoId],
+          context.previous,
+        );
+      }
       showApiErrorToast(err, "Failed to delete comment");
     },
   });

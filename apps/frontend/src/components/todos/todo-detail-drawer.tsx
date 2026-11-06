@@ -378,7 +378,10 @@ function DrawerBody({ todo, editArmed, onConsumeEditArm }: DrawerBodyProps) {
         className="flex min-h-0 flex-1 flex-col gap-0"
       >
         <div className="border-b px-4 pt-3">
-          <TabsList aria-label="Task detail sections">
+          <TabsList
+            aria-label="Task detail sections"
+            className="max-w-full overflow-x-auto"
+          >
             <TabsTrigger value="details">Details</TabsTrigger>
             <TabsTrigger value="subtasks">
               Subtasks

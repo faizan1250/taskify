@@ -51,7 +51,7 @@ func (p *UpdateTodoPayload) Validate() error {
 type GetTodosQuery struct {
 	Page         *int        `query:"page" validate:"omitempty,min=1"`
 	Limit        *int        `query:"limit" validate:"omitempty,min=1,max=100"`
-	Sort         *string     `query:"sort" validate:"omitempty,oneof=created_at updated_at title priority due_date status"`
+	Sort         *string     `query:"sort" validate:"omitempty,oneof=created_at updated_at title priority due_date status position"`
 	Order        *string     `query:"order" validate:"omitempty,oneof=asc desc"`
 	Search       *string     `query:"search" validate:"omitempty,min=1"`
 	Status       *Status     `query:"status" validate:"omitempty,oneof=draft active completed archived"`
@@ -254,4 +254,50 @@ func validateBulkIDs(ids []uuid.UUID) error {
 		}
 	}
 	return nil
+}
+
+// ------------------------------------------------------------
+// Reorder Todos DTOs
+// ------------------------------------------------------------
+
+// MaxReorderTodoIDs bounds reorder requests so one call cannot hold a
+// transaction open over an unbounded row set.
+const MaxReorderTodoIDs = 100
+
+// ReorderTodosPayload carries the caller's full desired order for drag
+// reorder. The server assigns position = index, so the payload is the
+// complete order, not a sparse patch. Duplicate IDs are rejected: two
+// slots for one row is a client bug, not a merge to guess at.
+type ReorderTodosPayload struct {
+	OrderedIDs []uuid.UUID `json:"orderedIds" validate:"required,min=1,max=100"`
+}
+
+func (p *ReorderTodosPayload) Validate() error {
+	validate := validator.New()
+	if err := validate.Struct(p); err != nil {
+		return err
+	}
+	if err := validateBulkIDs(p.OrderedIDs); err != nil {
+		return err
+	}
+	seen := make(map[uuid.UUID]struct{}, len(p.OrderedIDs))
+	for _, id := range p.OrderedIDs {
+		if _, ok := seen[id]; ok {
+			return errors.New("orderedIds must not contain duplicates")
+		}
+		seen[id] = struct{}{}
+	}
+	return nil
+}
+
+// PositionsForOrder maps each ID to its zero-based slot as a float position.
+// Pure domain helper shared by the repository reorder transaction and
+// Docker-free unit tests; float slots leave room for fractional indexing
+// without a schema change.
+func PositionsForOrder(ids []uuid.UUID) map[uuid.UUID]float64 {
+	positions := make(map[uuid.UUID]float64, len(ids))
+	for i, id := range ids {
+		positions[id] = float64(i)
+	}
+	return positions
 }

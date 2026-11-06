@@ -14,6 +14,7 @@ var allowedTodoSortColumns = map[string]string{ //nolint:gochecknoglobals // rea
 	"priority":   "t.priority",
 	"due_date":   "t.due_date",
 	"status":     "t.status",
+	"position":   "t.position",
 }
 
 // allowedCategorySortColumns maps client-supplied sort keys for categories

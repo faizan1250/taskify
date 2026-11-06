@@ -115,15 +115,15 @@ export function CategoriesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Categories</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Categories</h1>
           <p className="text-muted-foreground">
             Organize your tasks with custom categories
           </p>
         </div>
         <CategoryCreateForm>
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Category
           </Button>
@@ -137,12 +137,17 @@ export function CategoriesPage() {
         </CardHeader>
         <CardContent>
           <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Search
+              className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             <Input
               placeholder="Search categories..."
+              aria-label="Search categories"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               className="pl-10"
+              type="search"
             />
           </div>
         </CardContent>
@@ -184,7 +189,7 @@ export function CategoriesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="h-8 w-8 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100 transition-opacity"
                               aria-label={`Category actions for ${category.name}`}
                             >
                               <MoreHorizontal className="h-4 w-4" />
@@ -256,7 +261,7 @@ export function CategoriesPage() {
 
             {/* Pagination */}
             {categories.totalPages > 1 && (
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground">
                   Showing {((page - 1) * 20) + 1} to {Math.min(page * 20, categories.total)} of {categories.total} categories
                 </p>

@@ -329,7 +329,7 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="flex items-center gap-1 h-6 px-2 text-xs"
+                      className="flex h-8 items-center gap-1 px-2 text-xs"
                       onClick={() => setSubtasksExpanded((v) => !v)}
                       aria-expanded={subtasksExpanded}
                       aria-label={
@@ -351,7 +351,7 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
+                        className="h-8 w-8"
                         onClick={() => setSubtaskDialogOpen(true)}
                         aria-label={`Add subtask to ${todo.title}`}
                       >
@@ -365,7 +365,7 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-6 px-2 text-xs text-muted-foreground"
+                      className="h-8 px-2 text-xs text-muted-foreground"
                       onClick={() => setSubtaskDialogOpen(true)}
                       aria-label={`Add subtask to ${todo.title}`}
                     >

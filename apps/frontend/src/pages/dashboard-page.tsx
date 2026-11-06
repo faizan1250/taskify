@@ -150,15 +150,15 @@ export function DashboardPage() {
   return (
     <div className="dash-scope space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Dashboard</h1>
           <p className="text-muted-foreground">
             Overview of your tasks and productivity
           </p>
         </div>
         <TodoCreateForm>
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>

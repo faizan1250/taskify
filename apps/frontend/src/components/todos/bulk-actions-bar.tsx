@@ -136,7 +136,10 @@ export function BulkActionsBar({
 
   return (
     <>
-      <Card aria-label="Bulk actions">
+      <Card
+        aria-label="Bulk actions"
+        className="sticky bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 shadow-[0_2px_6px_rgba(0,0,0,0.12)]"
+      >
         <CardContent className="py-3">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <div className="flex items-center gap-2">

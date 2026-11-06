@@ -242,15 +242,15 @@ export function TodosPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Tasks</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">Tasks</h1>
           <p className="text-muted-foreground">
             Manage and organize your tasks
           </p>
         </div>
         <TodoCreateForm open={createOpen} onOpenChange={setCreateOpen}>
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             New Task
           </Button>
@@ -294,15 +294,20 @@ export function TodosPage() {
             <CardContent className="space-y-4">
               <div className="flex flex-col sm:flex-row gap-4">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Search
+                    className="absolute left-3 top-3 h-4 w-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
                   <Input
                     placeholder="Search tasks..."
+                    aria-label="Search tasks"
                     ref={searchRef}
                     value={searchInput}
                     onChange={(e) => {
                       setSearchInput(e.target.value);
                     }}
                     className="pl-10"
+                    type="search"
                   />
                 </div>
                 <Select value={category} onValueChange={setCategory}>
@@ -608,7 +613,7 @@ export function TodosPage() {
 
                 {/* Pagination */}
                 {todos.totalPages > 1 && (
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm text-muted-foreground">
                       Showing {(page - 1) * 20 + 1} to{" "}
                       {Math.min(page * 20, todos.total)} of {todos.total} tasks
@@ -651,9 +656,9 @@ export function TodosPage() {
               <TodosFirstRunEmptyState />
             )}
           </div>
-          {/* Keyboard hints */}
+          {/* Keyboard hints — desktop only; no keyboard on touch devices */}
           <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground"
+            className="hidden flex-wrap items-center gap-x-4 gap-y-2 pt-1 text-xs text-muted-foreground sm:flex"
             aria-label="Task list keyboard shortcuts"
           >
             <span className="inline-flex items-center gap-1.5">

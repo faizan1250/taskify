@@ -47,6 +47,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { setTheme } = useTheme();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   usePaletteHotkeys({
     onTogglePalette: () => setPaletteOpen((value) => !value),
@@ -63,14 +64,19 @@ export function AppLayout({ children }: AppLayoutProps) {
     onToggleTheme: () => setTheme(resolveThemeToggle()),
   });
 
-  const NavigationItems = () => (
+  const NavigationItems = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
       {navigation.map((item) => {
         const Icon = item.icon;
         const isActive = location.pathname === item.href;
 
         return (
-          <Link key={item.name} to={item.href}>
+          <Link
+            key={item.name}
+            to={item.href}
+            aria-current={isActive ? "page" : undefined}
+            onClick={onNavigate}
+          >
             <Button
               variant={isActive ? "secondary" : "ghost"}
               className={cn(
@@ -89,6 +95,12 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-[7px] focus:bg-primary focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
+      >
+        Skip to main content
+      </a>
       {/* Desktop Sidebar */}
       <div className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col">
         <div className="flex flex-col flex-grow pt-5 bg-card border-r overflow-y-auto">
@@ -96,7 +108,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             <h1 className="text-xl font-bold">Taskify</h1>
           </div>
           <div className="mt-8 flex-grow flex flex-col">
-            <nav className="flex-1 px-4 space-y-1">
+            <nav className="flex-1 px-4 space-y-1" aria-label="Primary">
               <NavigationItems />
             </nav>
           </div>
@@ -107,12 +119,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="md:hidden">
         <div className="bg-card border-b px-4 py-3 flex items-center justify-between">
           <h1 className="text-xl font-bold">Taskify</h1>
-          <Sheet>
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label="Open navigation menu"
+                aria-expanded={mobileNavOpen}
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -120,8 +133,8 @@ export function AppLayout({ children }: AppLayoutProps) {
             <SheetContent side="left" className="w-64">
               <div className="py-4">
                 <h1 className="text-xl font-bold mb-8">Taskify</h1>
-                <nav className="space-y-1">
-                  <NavigationItems />
+                <nav className="space-y-1" aria-label="Mobile">
+                  <NavigationItems onNavigate={() => setMobileNavOpen(false)} />
                 </nav>
               </div>
             </SheetContent>
@@ -133,10 +146,10 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="md:pl-64">
         {/* Top Bar */}
         <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b bg-card px-4 sm:gap-x-6 sm:px-6 lg:px-8">
-          <div className="flex flex-1 items-center gap-x-3 self-stretch py-3">
+          <div className="flex flex-1 items-center gap-x-2 self-stretch py-3 sm:gap-x-3">
             <Button
               variant="outline"
-              className="h-9 w-full max-w-md justify-start gap-2 font-normal text-muted-foreground"
+              className="h-9 min-w-9 justify-start gap-2 px-3 font-normal text-muted-foreground sm:w-full sm:max-w-md"
               onClick={() => setPaletteOpen(true)}
               aria-label="Search tasks and commands"
             >
@@ -150,7 +163,7 @@ export function AppLayout({ children }: AppLayoutProps) {
             </Button>
             <div className="ml-auto flex items-center gap-x-1 sm:gap-x-2">
               <TodoCreateForm>
-                <Button size="sm" data-new-task-trigger>
+                <Button size="sm" data-new-task-trigger aria-label="New task">
                   <Plus className="h-4 w-4" />
                   <span className="hidden md:inline">New Task</span>
                 </Button>
@@ -160,6 +173,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 size="icon"
                 aria-label="Keyboard shortcuts"
                 onClick={() => setShortcutsOpen(true)}
+                className="hidden sm:inline-flex"
               >
                 <Keyboard className="h-5 w-5" />
               </Button>
@@ -176,7 +190,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
 
         {/* Page Content */}
-        <main className="py-6">
+        <main id="main-content" tabIndex={-1} className="py-6 outline-none">
           <div className="px-4 sm:px-6 lg:px-8">
             <ErrorBoundary fallbackTitle="Page failed to load">
               {children}

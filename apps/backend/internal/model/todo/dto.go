@@ -11,13 +11,14 @@ import (
 // ------------------------------------------------------------
 
 type CreateTodoPayload struct {
-	Title        string     `json:"title" validate:"required,min=1,max=255"`
-	Description  *string    `json:"description" validate:"omitempty,max=1000"`
-	Priority     *Priority  `json:"priority" validate:"omitempty,oneof=low medium high"`
-	DueDate      *time.Time `json:"dueDate"`
-	ParentTodoID *uuid.UUID `json:"parentTodoId" validate:"omitempty,uuid"`
-	CategoryID   *uuid.UUID `json:"categoryId" validate:"omitempty,uuid"`
-	Metadata     *Metadata  `json:"metadata"`
+	Title        string      `json:"title" validate:"required,min=1,max=255"`
+	Description  *string     `json:"description" validate:"omitempty,max=1000"`
+	Priority     *Priority   `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueDate      *time.Time  `json:"dueDate"`
+	ParentTodoID *uuid.UUID  `json:"parentTodoId" validate:"omitempty,uuid"`
+	CategoryID   *uuid.UUID  `json:"categoryId" validate:"omitempty,uuid"`
+	Metadata     *Metadata   `json:"metadata"`
+	Recurrence   *Recurrence `json:"recurrence" validate:"omitempty,oneof=none daily weekly monthly"`
 }
 
 func (p *CreateTodoPayload) Validate() error {
@@ -28,15 +29,16 @@ func (p *CreateTodoPayload) Validate() error {
 // ------------------------------------------------------------
 
 type UpdateTodoPayload struct {
-	ID           uuid.UUID  `param:"id" validate:"required,uuid"`
-	Title        *string    `json:"title" validate:"omitempty,min=1,max=255"`
-	Description  *string    `json:"description" validate:"omitempty,max=1000"`
-	Status       *Status    `json:"status" validate:"omitempty,oneof=draft active completed archived"`
-	Priority     *Priority  `json:"priority" validate:"omitempty,oneof=low medium high"`
-	DueDate      *time.Time `json:"dueDate"`
-	ParentTodoID *uuid.UUID `json:"parentTodoId" validate:"omitempty,uuid"`
-	CategoryID   *uuid.UUID `json:"categoryId" validate:"omitempty,uuid"`
-	Metadata     *Metadata  `json:"metadata"`
+	ID           uuid.UUID   `param:"id" validate:"required,uuid"`
+	Title        *string     `json:"title" validate:"omitempty,min=1,max=255"`
+	Description  *string     `json:"description" validate:"omitempty,max=1000"`
+	Status       *Status     `json:"status" validate:"omitempty,oneof=draft active completed archived"`
+	Priority     *Priority   `json:"priority" validate:"omitempty,oneof=low medium high"`
+	DueDate      *time.Time  `json:"dueDate"`
+	ParentTodoID *uuid.UUID  `json:"parentTodoId" validate:"omitempty,uuid"`
+	CategoryID   *uuid.UUID  `json:"categoryId" validate:"omitempty,uuid"`
+	Metadata     *Metadata   `json:"metadata"`
+	Recurrence   *Recurrence `json:"recurrence" validate:"omitempty,oneof=none daily weekly monthly"`
 }
 
 func (p *UpdateTodoPayload) Validate() error {
@@ -47,19 +49,20 @@ func (p *UpdateTodoPayload) Validate() error {
 // ------------------------------------------------------------
 
 type GetTodosQuery struct {
-	Page         *int       `query:"page" validate:"omitempty,min=1"`
-	Limit        *int       `query:"limit" validate:"omitempty,min=1,max=100"`
-	Sort         *string    `query:"sort" validate:"omitempty,oneof=created_at updated_at title priority due_date status"`
-	Order        *string    `query:"order" validate:"omitempty,oneof=asc desc"`
-	Search       *string    `query:"search" validate:"omitempty,min=1"`
-	Status       *Status    `query:"status" validate:"omitempty,oneof=draft active completed archived"`
-	Priority     *Priority  `query:"priority" validate:"omitempty,oneof=low medium high"`
-	CategoryID   *uuid.UUID `query:"categoryId" validate:"omitempty,uuid"`
-	ParentTodoID *uuid.UUID `query:"parentTodoId" validate:"omitempty,uuid"`
-	DueFrom      *time.Time `query:"dueFrom"`
-	DueTo        *time.Time `query:"dueTo"`
-	Overdue      *bool      `query:"overdue"`
-	Completed    *bool      `query:"completed"`
+	Page         *int        `query:"page" validate:"omitempty,min=1"`
+	Limit        *int        `query:"limit" validate:"omitempty,min=1,max=100"`
+	Sort         *string     `query:"sort" validate:"omitempty,oneof=created_at updated_at title priority due_date status"`
+	Order        *string     `query:"order" validate:"omitempty,oneof=asc desc"`
+	Search       *string     `query:"search" validate:"omitempty,min=1"`
+	Status       *Status     `query:"status" validate:"omitempty,oneof=draft active completed archived"`
+	Priority     *Priority   `query:"priority" validate:"omitempty,oneof=low medium high"`
+	CategoryID   *uuid.UUID  `query:"categoryId" validate:"omitempty,uuid"`
+	ParentTodoID *uuid.UUID  `query:"parentTodoId" validate:"omitempty,uuid"`
+	DueFrom      *time.Time  `query:"dueFrom"`
+	DueTo        *time.Time  `query:"dueTo"`
+	Overdue      *bool       `query:"overdue"`
+	Completed    *bool       `query:"completed"`
+	Recurrence   *Recurrence `query:"recurrence" validate:"omitempty,oneof=none daily weekly monthly"`
 }
 
 func (q *GetTodosQuery) Validate() error {

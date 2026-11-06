@@ -161,3 +161,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Global reduced-motion guard for overlay motion (sheet/dialog/drawer).
+   The dashboard scope has its own guard; overlays render in a portal
+   outside it, so they need this one. State changes stay functional —
+   only the animation is removed (WCAG 2.3.3). */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="sheet-overlay"],
+  [data-slot="sheet-content"],
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-overlay"],
+  [data-slot="alert-dialog-content"],
+  [data-slot="drawer-overlay"],
+  [data-slot="drawer-content"] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

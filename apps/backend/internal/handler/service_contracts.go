@@ -21,6 +21,8 @@ type TodoServiceContract interface {
 	GetTodos(ctx echo.Context, userID string, query *todo.GetTodosQuery) (*model.PaginatedResponse[todo.PopulatedTodo], error)
 	UpdateTodo(ctx echo.Context, userID string, payload *todo.UpdateTodoPayload) (*todo.Todo, error)
 	DeleteTodo(ctx echo.Context, userID string, todoID uuid.UUID) error
+	BulkUpdateTodos(ctx echo.Context, userID string, payload *todo.BulkUpdateTodosPayload) (*todo.BulkUpdateTodosResult, error)
+	BulkDeleteTodos(ctx echo.Context, userID string, payload *todo.BulkDeleteTodosPayload) (*todo.BulkDeleteTodosResult, error)
 	GetTodoStats(ctx echo.Context, userID string) (*todo.TodoStats, error)
 	UploadTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
 	DeleteTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error

@@ -1,6 +1,7 @@
 package todo
 
 import (
+	"errors"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -154,4 +155,100 @@ type GetAttachmentPresignedURLPayload struct {
 func (p *GetAttachmentPresignedURLPayload) Validate() error {
 	validate := validator.New()
 	return validate.Struct(p)
+}
+
+// ------------------------------------------------------------
+// Bulk Todo DTOs
+// ------------------------------------------------------------
+
+// MaxBulkTodoIDs bounds bulk requests so one call cannot hold a
+// transaction open over an unbounded row set.
+const MaxBulkTodoIDs = 100
+
+// BulkTodoPatch is the shared per-item mutation applied to every ID in a
+// bulk update. At least one field must be set; nil fields are left untouched.
+type BulkTodoPatch struct {
+	Status     *Status    `json:"status" validate:"omitempty,oneof=draft active completed archived"`
+	Priority   *Priority  `json:"priority" validate:"omitempty,oneof=low medium high"`
+	CategoryID *uuid.UUID `json:"categoryId" validate:"omitempty,uuid"`
+	DueDate    *time.Time `json:"dueDate"`
+}
+
+// IsEmpty reports whether the patch carries no mutation.
+func (p BulkTodoPatch) IsEmpty() bool {
+	return p.Status == nil && p.Priority == nil && p.CategoryID == nil && p.DueDate == nil
+}
+
+// BulkTodoFailure is the per-ID error entry of a partial-failure report.
+// IDs absent from both the success list and Failed were never attempted,
+// which only happens when the whole operation fails with a 4xx/5xx instead.
+type BulkTodoFailure struct {
+	ID    uuid.UUID `json:"id"`
+	Error string    `json:"error"`
+}
+
+// BulkUpdateTodosPayload applies Patch to every todo in IDs.
+type BulkUpdateTodosPayload struct {
+	IDs   []uuid.UUID   `json:"ids" validate:"required,min=1,max=100"`
+	Patch BulkTodoPatch `json:"patch"`
+}
+
+func (p *BulkUpdateTodosPayload) Validate() error {
+	validate := validator.New()
+	if err := validate.Struct(p); err != nil {
+		return err
+	}
+	if err := validateBulkIDs(p.IDs); err != nil {
+		return err
+	}
+	if p.Patch.IsEmpty() {
+		return errors.New("patch must include at least one of: status, priority, categoryId, dueDate")
+	}
+	return nil
+}
+
+// BulkUpdateTodosResult carries the partial-failure report for a bulk update.
+type BulkUpdateTodosResult struct {
+	Updated []Todo            `json:"updated"`
+	Failed  []BulkTodoFailure `json:"failed"`
+}
+
+// HasFailures reports whether any ID failed while others succeeded.
+func (r *BulkUpdateTodosResult) HasFailures() bool {
+	return r != nil && len(r.Failed) > 0
+}
+
+// BulkDeleteTodosPayload deletes every todo in IDs.
+type BulkDeleteTodosPayload struct {
+	IDs []uuid.UUID `json:"ids" validate:"required,min=1,max=100"`
+}
+
+func (p *BulkDeleteTodosPayload) Validate() error {
+	validate := validator.New()
+	if err := validate.Struct(p); err != nil {
+		return err
+	}
+	return validateBulkIDs(p.IDs)
+}
+
+// BulkDeleteTodosResult carries the partial-failure report for a bulk delete.
+type BulkDeleteTodosResult struct {
+	Deleted []uuid.UUID       `json:"deleted"`
+	Failed  []BulkTodoFailure `json:"failed"`
+}
+
+// HasFailures reports whether any ID failed while others succeeded.
+func (r *BulkDeleteTodosResult) HasFailures() bool {
+	return r != nil && len(r.Failed) > 0
+}
+
+// validateBulkIDs rejects nil UUID entries that JSON or callers may sneak
+// past the length-only struct tags.
+func validateBulkIDs(ids []uuid.UUID) error {
+	for _, id := range ids {
+		if id == uuid.Nil {
+			return errors.New("ids must not contain empty UUIDs")
+		}
+	}
+	return nil
 }

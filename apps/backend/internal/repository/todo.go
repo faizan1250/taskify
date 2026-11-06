@@ -1036,3 +1036,158 @@ func (r *TodoRepository) GetTodoStatus(ctx context.Context, id uuid.UUID) (strin
 	}
 	return status, nil
 }
+
+// BulkUpdateTodos applies patch to every todo in ids inside a single
+// transaction scoped to userID. Per-item misses (unknown ID or a row owned
+// by another user) are reported in Failed instead of aborting the batch;
+// only a hard DB error rolls the transaction back. Updated and Failed
+// preserve input order. An empty patch is rejected to mirror UpdateTodo.
+func (r *TodoRepository) BulkUpdateTodos(ctx context.Context, userID string, ids []uuid.UUID, patch *todo.BulkTodoPatch) (*todo.BulkUpdateTodosResult, error) {
+	setClauses := []string{}
+	baseArgs := pgx.NamedArgs{
+		"user_id": userID,
+	}
+
+	if patch.Status != nil {
+		setClauses = append(setClauses, "status = @status")
+		baseArgs["status"] = *patch.Status
+
+		// Mirror UpdateTodo: completed_at follows the status transition.
+		if *patch.Status == todo.StatusCompleted {
+			setClauses = append(setClauses, "completed_at = NOW()")
+		} else {
+			setClauses = append(setClauses, "completed_at = NULL")
+		}
+	}
+
+	if patch.Priority != nil {
+		setClauses = append(setClauses, "priority = @priority")
+		baseArgs["priority"] = *patch.Priority
+	}
+
+	if patch.DueDate != nil {
+		setClauses = append(setClauses, "due_date = @due_date")
+		baseArgs["due_date"] = *patch.DueDate
+
+		// Mirror UpdateTodo: reminder flags reset only when the due date
+		// actually changes. IS DISTINCT FROM treats NULLs as comparable,
+		// so this stays a single statement with no per-row pre-read.
+		setClauses = append(setClauses,
+			"reminder_sent_at = CASE WHEN due_date IS DISTINCT FROM @due_date THEN NULL ELSE reminder_sent_at END",
+			"overdue_notified_at = CASE WHEN due_date IS DISTINCT FROM @due_date THEN NULL ELSE overdue_notified_at END",
+		)
+	}
+
+	if patch.CategoryID != nil {
+		setClauses = append(setClauses, "category_id = @category_id")
+		baseArgs["category_id"] = *patch.CategoryID
+	}
+
+	if len(setClauses) == 0 {
+		return nil, errs.NewBadRequestError("no fields to update", false, nil, nil, nil)
+	}
+
+	tx, err := r.server.DB.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin bulk update transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	stmt := "UPDATE todos SET " + strings.Join(setClauses, ", ") + " WHERE id = @id AND user_id = @user_id RETURNING *"
+
+	result := &todo.BulkUpdateTodosResult{
+		Updated: []todo.Todo{},
+		Failed:  []todo.BulkTodoFailure{},
+	}
+
+	for _, id := range ids {
+		args := make(pgx.NamedArgs, len(baseArgs)+1)
+		for k, v := range baseArgs {
+			args[k] = v
+		}
+		args["id"] = id
+
+		rows, err := tx.Query(ctx, stmt, args)
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute bulk update query for todo_id=%s: %w", id.String(), err)
+		}
+
+		updated, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[todo.Todo])
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				result.Failed = append(result.Failed, todo.BulkTodoFailure{ID: id, Error: "todo not found"})
+				continue
+			}
+			return nil, fmt.Errorf("failed to collect bulk update row for todo_id=%s: %w", id.String(), err)
+		}
+
+		result.Updated = append(result.Updated, updated)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit bulk update transaction: %w", err)
+	}
+
+	return result, nil
+}
+
+// BulkDeleteTodos deletes every todo in ids inside a single transaction
+// scoped to userID. IDs with no matching user-owned row are reported in
+// Failed instead of aborting the batch; only a hard DB error rolls the
+// transaction back. Deleted and Failed preserve input order.
+func (r *TodoRepository) BulkDeleteTodos(ctx context.Context, userID string, ids []uuid.UUID) (*todo.BulkDeleteTodosResult, error) {
+	tx, err := r.server.DB.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin bulk delete transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	stmt := `
+		DELETE FROM todos
+		WHERE
+			id = ANY(@ids::uuid[])
+			AND user_id = @user_id
+		RETURNING
+			id
+	`
+
+	rows, err := tx.Query(ctx, stmt, pgx.NamedArgs{
+		"ids":     ids,
+		"user_id": userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute bulk delete query: %w", err)
+	}
+
+	deletedIDs, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect bulk delete rows: %w", err)
+	}
+
+	deletedSet := make(map[uuid.UUID]struct{}, len(deletedIDs))
+	for _, id := range deletedIDs {
+		deletedSet[id] = struct{}{}
+	}
+
+	result := &todo.BulkDeleteTodosResult{
+		Deleted: []uuid.UUID{},
+		Failed:  []todo.BulkTodoFailure{},
+	}
+	for _, id := range ids {
+		if _, ok := deletedSet[id]; ok {
+			result.Deleted = append(result.Deleted, id)
+		} else {
+			result.Failed = append(result.Failed, todo.BulkTodoFailure{ID: id, Error: "todo not found"})
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit bulk delete transaction: %w", err)
+	}
+
+	return result, nil
+}

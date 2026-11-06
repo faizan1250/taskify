@@ -99,7 +99,7 @@ func TestTodoService_BulkUpdateTodos(t *testing.T) {
 		called := false
 		todoRepo.BulkUpdateTodosFn = func(_ context.Context, _ string, _ []uuid.UUID, _ *todo.BulkTodoPatch) (*todo.BulkUpdateTodosResult, error) {
 			called = true
-			return nil, nil
+			return nil, errFake
 		}
 		svc := service.NewTodoService(nil, todoRepo, catRepo, nil)
 		_, err := svc.BulkUpdateTodos(newEchoCtx(), "user-1", &todo.BulkUpdateTodosPayload{
@@ -182,7 +182,7 @@ func TestTodoService_BulkDeleteTodos(t *testing.T) {
 		called := false
 		todoRepo.BulkDeleteTodosFn = func(_ context.Context, _ string, _ []uuid.UUID) (*todo.BulkDeleteTodosResult, error) {
 			called = true
-			return nil, nil
+			return nil, errFake
 		}
 		svc := service.NewTodoService(nil, todoRepo, &FakeCategoryRepository{}, nil)
 		_, err := svc.BulkDeleteTodos(newEchoCtx(), "user-1", &todo.BulkDeleteTodosPayload{IDs: []uuid.UUID{idA}})

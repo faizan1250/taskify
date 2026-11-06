@@ -1385,6 +1385,166 @@
         ]
       }
     },
+    "/v1/todos/bulk": {
+      "patch": {
+        "description": "Apply one patch to many todos. Returns 200 when every ID succeeds and 207 with a per-ID failed report on partial failure.",
+        "summary": "Bulk update todos",
+        "tags": [
+          "Todo"
+        ],
+        "operationId": "bulkUpdateTodos",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "patch"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "patch": {
+                    "type": "object",
+                    "minProperties": 1,
+                    "properties": {
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "draft",
+                          "active",
+                          "completed",
+                          "archived"
+                        ]
+                      },
+                      "priority": {
+                        "type": "string",
+                        "enum": [
+                          "low",
+                          "medium",
+                          "high"
+                        ]
+                      },
+                      "categoryId": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                      },
+                      "dueDate": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "All todos updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateTodosResult"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Partial failure; see failed entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateTodosResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "description": "Delete many todos. Returns 200 when every ID is deleted and 207 with a per-ID failed report on partial failure.",
+        "summary": "Bulk delete todos",
+        "tags": [
+          "Todo"
+        ],
+        "operationId": "bulkDeleteTodos",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 100,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "All todos deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteTodosResult"
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Partial failure; see failed entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteTodosResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid payload"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
     "/v1/todos/stats": {
       "get": {
         "description": "Get todo statistics",
@@ -2347,6 +2507,67 @@
         "type": "apiKey",
         "name": "x-service-token",
         "in": "header"
+      }
+    },
+    "schemas": {
+      "BulkTodoFailure": {
+        "type": "object",
+        "required": [
+          "id",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "BulkUpdateTodosResult": {
+        "type": "object",
+        "required": [
+          "updated",
+          "failed"
+        ],
+        "properties": {
+          "updated": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkTodoFailure"
+            }
+          }
+        }
+      },
+      "BulkDeleteTodosResult": {
+        "type": "object",
+        "required": [
+          "deleted",
+          "failed"
+        ],
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkTodoFailure"
+            }
+          }
+        }
       }
     }
   }

@@ -16,6 +16,8 @@ func registerTodoRoutes(r *echo.Group, h *handler.TodoHandler, ch *handler.Comme
 	todos.POST("", h.CreateTodo)
 	todos.GET("", h.GetTodos)
 	todos.GET("/stats", h.GetTodoStats)
+	todos.PATCH("/bulk", h.BulkUpdateTodos)
+	todos.DELETE("/bulk", h.BulkDeleteTodos)
 
 	// Individual todo operations
 	dynamicTodo := todos.Group("/:id")

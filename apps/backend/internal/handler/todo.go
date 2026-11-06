@@ -8,6 +8,7 @@ import (
 	"github.com/faizan1250/taskify/internal/model"
 	"github.com/faizan1250/taskify/internal/model/todo"
 	"github.com/faizan1250/taskify/internal/server"
+	"github.com/faizan1250/taskify/internal/validation"
 	"github.com/labstack/echo/v4"
 )
 
@@ -81,6 +82,49 @@ func (h *TodoHandler) DeleteTodo(c echo.Context) error {
 		http.StatusNoContent,
 		&todo.DeleteTodoPayload{},
 	)(c)
+}
+
+// BulkUpdateTodos applies one patch to many todos. It returns 200 when every
+// ID succeeds and 207 Multi-Status with a per-ID failed report otherwise.
+// These handlers bind manually instead of Handle() because the success
+// status is dynamic; validation still flows through BindAndValidate, so
+// malformed payloads return 400 identically.
+func (h *TodoHandler) BulkUpdateTodos(c echo.Context) error {
+	payload := &todo.BulkUpdateTodosPayload{}
+	if err := validation.BindAndValidate(c, payload); err != nil {
+		return err
+	}
+	userID := middleware.GetUserID(c)
+	result, err := h.todoService.BulkUpdateTodos(c, userID, payload)
+	if err != nil {
+		return err
+	}
+	status := http.StatusOK
+	if result.HasFailures() {
+		status = http.StatusMultiStatus
+	}
+	return c.JSON(status, result)
+}
+
+// BulkDeleteTodos deletes many todos. Like BulkUpdateTodos it returns 200
+// on full success and 207 Multi-Status on partial failure. Echo binds JSON
+// bodies on DELETE, so DELETE /todos/bulk with {ids[]} needs no
+// POST workaround.
+func (h *TodoHandler) BulkDeleteTodos(c echo.Context) error {
+	payload := &todo.BulkDeleteTodosPayload{}
+	if err := validation.BindAndValidate(c, payload); err != nil {
+		return err
+	}
+	userID := middleware.GetUserID(c)
+	result, err := h.todoService.BulkDeleteTodos(c, userID, payload)
+	if err != nil {
+		return err
+	}
+	status := http.StatusOK
+	if result.HasFailures() {
+		status = http.StatusMultiStatus
+	}
+	return c.JSON(status, result)
 }
 
 func (h *TodoHandler) GetTodoStats(c echo.Context) error {

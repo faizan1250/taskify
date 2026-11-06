@@ -9,6 +9,7 @@ import { TodoCard } from "@/components/todos/todo-card";
 import { TodoCreateForm } from "@/components/todos/todo-create-form";
 import { TodoDetailDrawer } from "@/components/todos/todo-detail-drawer";
 import { DashboardEmptyState } from "@/components/dashboard/dashboard-empty-state";
+import { QueryErrorState } from "@/components/query-error-state";
 import { FirstRunChecklist } from "@/components/dashboard/first-run-checklist";
 import { toDueBoundISO } from "@/hooks/use-todos-search-params";
 import {
@@ -30,11 +31,24 @@ function toDateKey(date: Date): string {
 }
 
 export function DashboardPage() {
-  const { data: stats, isLoading: statsLoading } = useGetTodoStats();
-  const { data: recentTodos, isLoading: todosLoading } = useGetAllTodos({
+  const { data: stats, isLoading: statsLoading, isError: statsFailed } =
+    useGetTodoStats();
+  const {
+    data: recentTodos,
+    isLoading: todosLoading,
+    isError: recentFailed,
+    isFetching: recentFetching,
+    refetch: refetchRecent,
+  } = useGetAllTodos({
     query: { page: 1, limit: 5, sort: "updated_at", order: "desc" },
   });
-  const { data: categories, isLoading: categoriesLoading } = useGetAllCategories({
+  const {
+    data: categories,
+    isLoading: categoriesLoading,
+    isError: categoriesFailed,
+    isFetching: categoriesFetching,
+    refetch: refetchCategories,
+  } = useGetAllCategories({
     query: { page: 1, limit: 10 },
   });
 
@@ -46,7 +60,13 @@ export function DashboardPage() {
     return { dueFrom: toDateKey(from), dueTo: toDateKey(to) };
   }, []);
 
-  const { data: weekTodos, isLoading: weekLoading } = useGetAllTodos({
+  const {
+    data: weekTodos,
+    isLoading: weekLoading,
+    isError: weekFailed,
+    isFetching: weekFetching,
+    refetch: refetchWeek,
+  } = useGetAllTodos({
     query: {
       page: 1,
       limit: 5,
@@ -57,13 +77,19 @@ export function DashboardPage() {
     },
   });
 
-  const { data: overdueTodos, isLoading: overdueLoading } = useGetAllTodos({
+  const {
+    data: overdueTodos,
+    isLoading: overdueLoading,
+    isError: overdueFailed,
+    isFetching: overdueFetching,
+    refetch: refetchOverdue,
+  } = useGetAllTodos({
     query: { page: 1, limit: 5, sort: "due_date", order: "asc", overdue: true },
   });
 
   // Category counts: tallied client-side from a wider recent slice so each
   // category row can link to its pre-filtered task list.
-  const { data: countSample } = useGetAllTodos({
+  const { data: countSample, isError: countFailed } = useGetAllTodos({
     query: { page: 1, limit: 100, sort: "updated_at", order: "desc" },
   });
   const countsByCategory = useMemo(() => {
@@ -139,8 +165,10 @@ export function DashboardPage() {
         </TodoCreateForm>
       </div>
 
-      {/* First-run onboarding checklist (dismissible, localStorage). */}
-      {!statsLoading && (
+      {/* First-run onboarding checklist (dismissible, localStorage). Hidden
+          while stats load or when stats fail — zeros during an outage must
+          not read as "you haven't started yet". */}
+      {!statsLoading && !statsFailed && (
         <FirstRunChecklist
           hasTask={(stats?.total ?? 0) > 0}
           hasCategory={(categories?.total ?? 0) > 0}
@@ -156,7 +184,7 @@ export function DashboardPage() {
             <Link
               key={stat.title}
               to={stat.to}
-              aria-label={`${stat.title}: ${stat.value}. ${stat.filterLabel}`}
+              aria-label={`${stat.title}: ${statsFailed ? "couldn't load" : stat.value}. ${stat.filterLabel}`}
               className="dash-focusable rounded-[7px] transition-colors hover:border-ring"
             >
               <Card>
@@ -172,6 +200,8 @@ export function DashboardPage() {
                   <div className="text-2xl font-bold">
                     {statsLoading ? (
                       <Skeleton className="h-8 w-12" />
+                    ) : statsFailed ? (
+                      <span title="Couldn't load stats">–</span>
                     ) : (
                       stat.value
                     )}
@@ -217,6 +247,14 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
+            ) : overdueFailed ? (
+              <QueryErrorState
+                variant="compact"
+                title="Couldn't load overdue tasks"
+                description="Check your connection and try again — this lane updates automatically."
+                onRetry={() => void refetchOverdue()}
+                isRetrying={overdueFetching}
+              />
             ) : overdueTodos?.data?.length ? (
               <div className="space-y-3">
                 {overdueTodos.data.slice(0, 5).map((todo) => (
@@ -258,6 +296,14 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
+            ) : weekFailed ? (
+              <QueryErrorState
+                variant="compact"
+                title="Couldn't load this week's tasks"
+                description="Check your connection and try again — this lane updates automatically."
+                onRetry={() => void refetchWeek()}
+                isRetrying={weekFetching}
+              />
             ) : weekTodos?.data?.length ? (
               <div className="space-y-3">
                 {weekTodos.data.slice(0, 5).map((todo) => (
@@ -306,6 +352,14 @@ export function DashboardPage() {
                   </div>
                 ))}
               </div>
+            ) : recentFailed ? (
+              <QueryErrorState
+                variant="compact"
+                title="Couldn't load recent tasks"
+                description="Check your connection and try again — this lane updates automatically."
+                onRetry={() => void refetchRecent()}
+                isRetrying={recentFetching}
+              />
             ) : recentTodos?.data?.length ? (
               <div className="space-y-3">
                 {recentTodos.data.slice(0, 5).map((todo) => (
@@ -350,6 +404,14 @@ export function DashboardPage() {
                   <Skeleton key={i} className="h-8 w-full" />
                 ))}
               </div>
+            ) : categoriesFailed ? (
+              <QueryErrorState
+                variant="compact"
+                title="Couldn't load categories"
+                description="Check your connection and try again."
+                onRetry={() => void refetchCategories()}
+                isRetrying={categoriesFetching}
+              />
             ) : categories?.data?.length ? (
               <div className="space-y-2">
                 {categories.data.slice(0, 6).map((category) => {
@@ -358,7 +420,11 @@ export function DashboardPage() {
                     <Link
                       key={category.id}
                       to={`/todos?category=${category.id}`}
-                      aria-label={`${category.name}, ${count} recent task${count === 1 ? "" : "s"}. View tasks in this category`}
+                      aria-label={
+                        countFailed
+                          ? `${category.name}. View tasks in this category`
+                          : `${category.name}, ${count} recent task${count === 1 ? "" : "s"}. View tasks in this category`
+                      }
                       className="dash-focusable flex items-center justify-between rounded-[7px] border p-2 transition-colors hover:border-ring"
                     >
                       <span className="flex items-center gap-2">
@@ -371,13 +437,15 @@ export function DashboardPage() {
                           {category.name}
                         </span>
                       </span>
-                      <span
-                        role="status"
-                        aria-label={`${count} tasks`}
-                        className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
-                      >
-                        {count}
-                      </span>
+                      {!countFailed && (
+                        <span
+                          role="status"
+                          aria-label={`${count} tasks`}
+                          className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums text-muted-foreground"
+                        >
+                          {count}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

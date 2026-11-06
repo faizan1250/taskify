@@ -411,10 +411,10 @@ func (s *TodoService) CleanupS3AttachmentsAsync(reqCtx context.Context, keys []s
 	}()
 }
 
-func (s *TodoService) GetTodoStats(ctx echo.Context, userID string) (*todo.TodoStats, error) {
+func (s *TodoService) GetTodoStats(ctx echo.Context, userID string, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error) {
 	logger := middleware.GetLogger(ctx)
 
-	stats, err := s.todoRepo.GetTodoStats(ctx.Request().Context(), userID)
+	stats, err := s.todoRepo.GetTodoStats(ctx.Request().Context(), userID, payload.IncludeCategoryCounts())
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to fetch todo statistics")
 		return nil, err

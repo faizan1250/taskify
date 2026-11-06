@@ -205,9 +205,11 @@ func TestTodoHandler_DeleteTodo(t *testing.T) {
 func TestTodoHandler_GetTodoStats(t *testing.T) {
 	t.Run("success returns 200", func(t *testing.T) {
 		fake := &FakeTodoService{
-			GetTodoStatsFn: func(ctx echo.Context, userID string) (*todo.TodoStats, error) {
+			GetTodoStatsFn: func(ctx echo.Context, userID string, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error) {
 				assert.Equal(t, testUserID, userID)
-				return &todo.TodoStats{Total: 3, Active: 2, Completed: 1}, nil
+				require.NotNil(t, payload)
+				assert.True(t, payload.IncludeCategoryCounts())
+				return &todo.TodoStats{Total: 3, Active: 2, Completed: 1, DueThisWeek: 1, ByCategory: []todo.CategoryTodoCount{{Name: "work", Count: 2}}}, nil
 			},
 		}
 		h := handler.NewTodoHandler(&server.Server{}, fake)
@@ -216,6 +218,25 @@ func TestTodoHandler_GetTodoStats(t *testing.T) {
 		require.NoError(t, h.GetTodoStats(c))
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Contains(t, rec.Body.String(), `"total":3`)
+		assert.Contains(t, rec.Body.String(), `"dueThisWeek":1`)
+		assert.Contains(t, rec.Body.String(), `"byCategory"`)
+	})
+
+	t.Run("includeCounts=false binds and forwards", func(t *testing.T) {
+		fake := &FakeTodoService{
+			GetTodoStatsFn: func(ctx echo.Context, userID string, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error) {
+				require.NotNil(t, payload)
+				require.NotNil(t, payload.IncludeCounts)
+				assert.False(t, *payload.IncludeCounts)
+				return &todo.TodoStats{Total: 1, DueThisWeek: 0, ByCategory: []todo.CategoryTodoCount{}}, nil
+			},
+		}
+		h := handler.NewTodoHandler(&server.Server{}, fake)
+		c, rec := newHandlerContext(http.MethodGet, "/todos/stats?includeCounts=false", nil, "", nil, testUserID)
+
+		require.NoError(t, h.GetTodoStats(c))
+		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"byCategory":[]`)
 	})
 }
 

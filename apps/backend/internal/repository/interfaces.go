@@ -20,7 +20,7 @@ type TodoRepositoryInterface interface {
 	DeleteTodo(ctx context.Context, userID string, todoID uuid.UUID) error
 	BulkUpdateTodos(ctx context.Context, userID string, ids []uuid.UUID, patch *todo.BulkTodoPatch) (*todo.BulkUpdateTodosResult, error)
 	BulkDeleteTodos(ctx context.Context, userID string, ids []uuid.UUID) (*todo.BulkDeleteTodosResult, error)
-	GetTodoStats(ctx context.Context, userID string) (*todo.TodoStats, error)
+	GetTodoStats(ctx context.Context, userID string, includeCounts bool) (*todo.TodoStats, error)
 	GetTodoAttachment(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) (*todo.TodoAttachment, error)
 	GetTodoAttachments(ctx context.Context, todoID uuid.UUID) ([]todo.TodoAttachment, error)
 	DeleteTodoAttachment(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) error

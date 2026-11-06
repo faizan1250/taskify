@@ -108,7 +108,7 @@ type FakeTodoService struct {
 	BulkUpdateTodosFn           func(ctx echo.Context, userID string, payload *todo.BulkUpdateTodosPayload) (*todo.BulkUpdateTodosResult, error)
 	BulkDeleteTodosFn           func(ctx echo.Context, userID string, payload *todo.BulkDeleteTodosPayload) (*todo.BulkDeleteTodosResult, error)
 	ReorderTodosFn              func(ctx echo.Context, userID string, payload *todo.ReorderTodosPayload) ([]todo.Todo, error)
-	GetTodoStatsFn              func(ctx echo.Context, userID string) (*todo.TodoStats, error)
+	GetTodoStatsFn              func(ctx echo.Context, userID string, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error)
 	UploadTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
 	DeleteTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentPresignedURLFn func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) (string, error)
@@ -172,11 +172,11 @@ func (f *FakeTodoService) ReorderTodos(ctx echo.Context, userID string, payload 
 	return f.ReorderTodosFn(ctx, userID, payload)
 }
 
-func (f *FakeTodoService) GetTodoStats(ctx echo.Context, userID string) (*todo.TodoStats, error) {
+func (f *FakeTodoService) GetTodoStats(ctx echo.Context, userID string, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error) {
 	if f.GetTodoStatsFn == nil {
 		return nil, errFakeService
 	}
-	return f.GetTodoStatsFn(ctx, userID)
+	return f.GetTodoStatsFn(ctx, userID, payload)
 }
 
 func (f *FakeTodoService) UploadTodoAttachment(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error) {

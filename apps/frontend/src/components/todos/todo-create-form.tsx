@@ -82,6 +82,8 @@ export function TodoCreateForm({
     onOpenChange?.(next);
   };
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [failedUploads, setFailedUploads] = useState<File[]>([]);
+  const [createdTodoId, setCreatedTodoId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const createTodo = useCreateTodo();
   const uploadAttachment = useUploadTodoAttachment();
@@ -122,6 +124,8 @@ export function TodoCreateForm({
         dueDate: undefined,
       });
       setAttachments([]);
+      setFailedUploads([]);
+      setCreatedTodoId(null);
     }
   }, [dialogOpen, defaultParentId, form]);
 
@@ -142,10 +146,61 @@ export function TodoCreateForm({
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+    const target = attachments[index];
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    // Removing a failed file drops it from the retry set too.
+    if (target && failedUploads.includes(target) && failedUploads.length === 1) {
+      setFailedUploads([]);
+      setCreatedTodoId(null);
+    } else if (target) {
+      setFailedUploads((prev) => prev.filter((f) => f !== target));
+    }
   };
 
+  const isRetrying = createdTodoId !== null && failedUploads.length > 0;
+  const submitLabel = isRetrying
+    ? uploadAttachment.isPending
+      ? "Retrying…"
+      : `Retry ${failedUploads.length} failed file${failedUploads.length === 1 ? "" : "s"}`
+    : createTodo.isPending
+      ? "Creating..."
+      : uploadAttachment.isPending
+        ? "Uploading..."
+        : "Create Task";
+
   const onSubmit = async (data: CreateTodoForm) => {
+    // Retry path: the task already exists, only the failed files remain.
+    if (createdTodoId && failedUploads.length > 0) {
+      const results = await Promise.allSettled(
+        failedUploads.map((file) =>
+          uploadAttachment.mutateAsync({ todoId: createdTodoId, file }),
+        ),
+      );
+      const stillFailed = failedUploads.filter(
+        (_, i) => results[i].status === "rejected",
+      );
+      setFailedUploads(stillFailed);
+      if (stillFailed.length === 0) {
+        toast.success("Attachments uploaded successfully!");
+        form.reset({
+          title: "",
+          description: "",
+          priority: "medium",
+          categoryId: "none",
+          parentTodoId: defaultParentId ?? "none",
+          dueDate: undefined,
+        });
+        setAttachments([]);
+        setCreatedTodoId(null);
+        handleOpenChange(false);
+      } else {
+        toast.error(
+          `${stillFailed.length} attachment${stillFailed.length === 1 ? "" : "s"} still failing — files are kept above for another retry.`,
+        );
+      }
+      return;
+    }
+
     try {
       const createdTodo = await createTodo.mutateAsync({
         body: {
@@ -162,12 +217,27 @@ export function TodoCreateForm({
         },
       });
 
-      // Upload attachments if any
+      // Two-phase honesty: the task exists even if uploads fail, so never
+      // report "failed to create" for an upload problem — keep the dialog
+      // open with the failed files listed for retry.
       if (attachments.length > 0) {
-        const uploadPromises = attachments.map(file => 
-          uploadAttachment.mutateAsync({ todoId: createdTodo.id, file })
+        const results = await Promise.allSettled(
+          attachments.map((file) =>
+            uploadAttachment.mutateAsync({ todoId: createdTodo.id, file }),
+          ),
         );
-        await Promise.all(uploadPromises);
+        const failed = attachments.filter(
+          (_, i) => results[i].status === "rejected",
+        );
+        if (failed.length > 0) {
+          setCreatedTodoId(createdTodo.id);
+          setFailedUploads(failed);
+          setAttachments(failed);
+          toast.success(
+            `Task created — ${failed.length} attachment${failed.length === 1 ? "" : "s"} failed to upload, retry below.`,
+          );
+          return;
+        }
       }
 
       toast.success("Task created successfully!");
@@ -189,13 +259,35 @@ export function TodoCreateForm({
   return (
     <Dialog open={dialogOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto px-1">
+            {failedUploads.length > 0 && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+              >
+                <p className="font-medium text-destructive">
+                  Task created, but {failedUploads.length} attachment
+                  {failedUploads.length === 1 ? "" : "s"} failed to upload:
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                  {failedUploads.map((file) => (
+                    <li key={file.name} className="truncate">
+                      {file.name}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Press “Create Task” again to retry the failed files, or
+                  close and attach them later.
+                </p>
+              </div>
+            )}
             <FormField
               control={form.control}
               name="title"
@@ -460,7 +552,7 @@ export function TodoCreateForm({
                 Cancel
               </Button>
               <Button type="submit" disabled={createTodo.isPending || uploadAttachment.isPending}>
-                {createTodo.isPending ? "Creating..." : uploadAttachment.isPending ? "Uploading..." : "Create Task"}
+                {submitLabel}
               </Button>
             </div>
           </form>

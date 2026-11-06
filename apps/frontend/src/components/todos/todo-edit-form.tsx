@@ -67,6 +67,7 @@ interface TodoEditFormProps {
 export function TodoEditForm({ todo, children }: TodoEditFormProps) {
   const [open, setOpen] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
+  const [failedUploads, setFailedUploads] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const updateTodo = useUpdateTodo();
   const uploadAttachment = useUploadTodoAttachment();
@@ -106,6 +107,7 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
         dueDate: todo.dueDate ? new Date(todo.dueDate) : undefined,
       });
       setAttachments([]);
+      setFailedUploads([]);
     }
   }, [open, todo, form]);
 
@@ -126,7 +128,11 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments(prev => prev.filter((_, i) => i !== index));
+    const target = attachments[index];
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+    if (target) {
+      setFailedUploads((prev) => prev.filter((f) => f !== target));
+    }
   };
 
   const onSubmit = async (data: UpdateTodoForm) => {
@@ -148,15 +154,30 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
         },
       });
 
-      // Upload new attachments if any
+      // Two-phase honesty: the update is saved even if uploads fail, so a
+      // partial upload failure keeps the dialog open with the failed files
+      // listed for retry instead of claiming the update failed.
       if (attachments.length > 0) {
-        const uploadPromises = attachments.map(file => 
-          uploadAttachment.mutateAsync({ todoId: todo.id, file })
+        const results = await Promise.allSettled(
+          attachments.map((file) =>
+            uploadAttachment.mutateAsync({ todoId: todo.id, file }),
+          ),
         );
-        await Promise.all(uploadPromises);
+        const failed = attachments.filter(
+          (_, i) => results[i].status === "rejected",
+        );
+        if (failed.length > 0) {
+          setFailedUploads(failed);
+          setAttachments(failed);
+          toast.success(
+            `Task updated — ${failed.length} attachment${failed.length === 1 ? "" : "s"} failed to upload, retry below.`,
+          );
+          return;
+        }
       }
 
       toast.success("Task updated successfully!");
+      setFailedUploads([]);
       setOpen(false);
     } catch {
       toast.error("Failed to update task");
@@ -423,6 +444,27 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
 
             {/* Attachments Section */}
             <div className="space-y-4">
+              {failedUploads.length > 0 && (
+                <div
+                  role="alert"
+                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+                >
+                  <p className="font-medium text-destructive">
+                    Task updated, but {failedUploads.length} attachment
+                    {failedUploads.length === 1 ? "" : "s"} failed to upload:
+                  </p>
+                  <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                    {failedUploads.map((file) => (
+                      <li key={file.name} className="truncate">
+                        {file.name}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Press “Update Task” again to retry the failed files.
+                  </p>
+                </div>
+              )}
               {/* Current Attachments */}
               {todo.attachments && todo.attachments.length > 0 && (
                 <TodoAttachments
@@ -500,7 +542,15 @@ export function TodoEditForm({ todo, children }: TodoEditFormProps) {
                 Cancel
               </Button>
               <Button type="submit" disabled={updateTodo.isPending || uploadAttachment.isPending}>
-                {updateTodo.isPending ? "Updating..." : uploadAttachment.isPending ? "Uploading..." : "Update Task"}
+                {updateTodo.isPending
+                  ? "Updating..."
+                  : uploadAttachment.isPending
+                    ? failedUploads.length > 0
+                      ? "Retrying…"
+                      : "Uploading..."
+                    : failedUploads.length > 0
+                      ? `Retry ${failedUploads.length} failed file${failedUploads.length === 1 ? "" : "s"}`
+                      : "Update Task"}
               </Button>
             </div>
           </form>

@@ -117,10 +117,25 @@ func (p *DeleteTodoPayload) Validate() error {
 
 // ------------------------------------------------------------
 
-type GetTodoStatsPayload struct{}
+type GetTodoStatsPayload struct {
+	// IncludeCounts opts out of the per-category breakdown (one extra
+	// aggregate query) when false. Nil (param absent) defaults to true so
+	// the endpoint stays a single call instead of N+1 category queries.
+	// DueThisWeek is always computed in the base aggregate query.
+	IncludeCounts *bool `query:"includeCounts"`
+}
 
 func (p *GetTodoStatsPayload) Validate() error {
 	return nil
+}
+
+// IncludeCategoryCounts reports whether the per-category breakdown should
+// be computed. Absent param means include.
+func (p *GetTodoStatsPayload) IncludeCategoryCounts() bool {
+	if p == nil || p.IncludeCounts == nil {
+		return true
+	}
+	return *p.IncludeCounts
 }
 
 // ------------------------------------------------------------

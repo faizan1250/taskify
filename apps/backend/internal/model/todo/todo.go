@@ -62,12 +62,23 @@ type PopulatedTodo struct {
 }
 
 type TodoStats struct {
-	Total     int `json:"total"`
-	Draft     int `json:"draft"`
-	Active    int `json:"active"`
-	Completed int `json:"completed"`
-	Archived  int `json:"archived"`
-	Overdue   int `json:"overdue"`
+	Total       int                 `json:"total" db:"total"`
+	Draft       int                 `json:"draft" db:"draft"`
+	Active      int                 `json:"active" db:"active"`
+	Completed   int                 `json:"completed" db:"completed"`
+	Archived    int                 `json:"archived" db:"archived"`
+	Overdue     int                 `json:"overdue" db:"overdue"`
+	DueThisWeek int                 `json:"dueThisWeek" db:"due_this_week"`
+	ByCategory  []CategoryTodoCount `json:"byCategory"`
+}
+
+// CategoryTodoCount is one row of the per-category breakdown returned by
+// GET /todos/stats. CategoryID is nil for uncategorized todos; Name is ""
+// in that case. Count covers all statuses so sum(ByCategory) == Total.
+type CategoryTodoCount struct {
+	CategoryID *uuid.UUID `json:"categoryId" db:"category_id"`
+	Name       string     `json:"name" db:"name"`
+	Count      int        `json:"count" db:"count"`
 }
 
 type UserWeeklyStats struct {

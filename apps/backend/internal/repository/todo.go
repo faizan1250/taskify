@@ -485,7 +485,7 @@ func (r *TodoRepository) DeleteTodo(ctx context.Context, userID string, todoID u
 	return nil
 }
 
-func (r *TodoRepository) GetTodoStats(ctx context.Context, userID string) (*todo.TodoStats, error) {
+func (r *TodoRepository) GetTodoStats(ctx context.Context, userID string, includeCounts bool) (*todo.TodoStats, error) {
 	stmt := `
 		SELECT
 			COUNT(*) AS total,
@@ -514,7 +514,14 @@ func (r *TodoRepository) GetTodoStats(ctx context.Context, userID string) (*todo
 					WHEN due_date<NOW()
 					AND status!='completed' THEN 1
 				END
-			) AS overdue
+			) AS overdue,
+			COUNT(
+				CASE
+					WHEN due_date>=NOW()
+					AND due_date<=NOW() + INTERVAL '7 days'
+					AND status NOT IN ('completed','archived') THEN 1
+				END
+			) AS due_this_week
 		FROM
 			todos
 		WHERE
@@ -531,6 +538,50 @@ func (r *TodoRepository) GetTodoStats(ctx context.Context, userID string) (*todo
 	stats, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[todo.TodoStats])
 	if err != nil {
 		return nil, fmt.Errorf("failed to collect row from table:todos: %w", err)
+	}
+
+	// Per-category breakdown is a single GROUP BY aggregate scoped to the
+	// caller — never a per-category loop (N+1). Skipped entirely when the
+	// caller opts out via ?includeCounts=false.
+	stats.ByCategory = []todo.CategoryTodoCount{}
+	if !includeCounts {
+		return &stats, nil
+	}
+
+	countStmt := `
+		SELECT
+			t.category_id,
+			COALESCE(c.name, '') AS name,
+			COUNT(*) AS count
+		FROM
+			todos t
+			LEFT JOIN todo_categories c ON c.id = t.category_id AND c.user_id = @user_id
+		WHERE
+			t.user_id = @user_id
+		GROUP BY
+			t.category_id, c.name
+		ORDER BY
+			count DESC
+	`
+
+	countRows, err := r.server.DB.Pool.Query(ctx, countStmt, pgx.NamedArgs{
+		"user_id": userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute per-category stats query: %w", err)
+	}
+
+	counts, err := pgx.CollectRows(countRows, pgx.RowToStructByName[todo.CategoryTodoCount])
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return &stats, nil
+		}
+		return nil, fmt.Errorf("failed to collect per-category rows from table:todos: %w", err)
+	}
+
+	stats.ByCategory = counts
+	if stats.ByCategory == nil {
+		stats.ByCategory = []todo.CategoryTodoCount{}
 	}
 
 	return &stats, nil

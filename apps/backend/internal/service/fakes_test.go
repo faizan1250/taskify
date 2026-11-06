@@ -41,7 +41,7 @@ type FakeTodoRepository struct {
 	DeleteTodoFn                          func(ctx context.Context, userID string, todoID uuid.UUID) error
 	BulkUpdateTodosFn                     func(ctx context.Context, userID string, ids []uuid.UUID, patch *todo.BulkTodoPatch) (*todo.BulkUpdateTodosResult, error)
 	BulkDeleteTodosFn                     func(ctx context.Context, userID string, ids []uuid.UUID) (*todo.BulkDeleteTodosResult, error)
-	GetTodoStatsFn                        func(ctx context.Context, userID string) (*todo.TodoStats, error)
+	GetTodoStatsFn                        func(ctx context.Context, userID string, includeCounts bool) (*todo.TodoStats, error)
 	GetTodoAttachmentFn                   func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) (*todo.TodoAttachment, error)
 	GetTodoAttachmentsFn                  func(ctx context.Context, todoID uuid.UUID) ([]todo.TodoAttachment, error)
 	DeleteTodoAttachmentFn                func(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) error
@@ -110,11 +110,11 @@ func (f *FakeTodoRepository) BulkDeleteTodos(ctx context.Context, userID string,
 	return f.BulkDeleteTodosFn(ctx, userID, ids)
 }
 
-func (f *FakeTodoRepository) GetTodoStats(ctx context.Context, userID string) (*todo.TodoStats, error) {
+func (f *FakeTodoRepository) GetTodoStats(ctx context.Context, userID string, includeCounts bool) (*todo.TodoStats, error) {
 	if f.GetTodoStatsFn == nil {
 		return nil, errFake
 	}
-	return f.GetTodoStatsFn(ctx, userID)
+	return f.GetTodoStatsFn(ctx, userID, includeCounts)
 }
 
 func (f *FakeTodoRepository) GetTodoAttachment(ctx context.Context, todoID uuid.UUID, attachmentID uuid.UUID) (*todo.TodoAttachment, error) {

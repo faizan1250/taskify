@@ -149,7 +149,7 @@ func (h *TodoHandler) GetTodoStats(c echo.Context) error {
 		h.Handler,
 		func(c echo.Context, payload *todo.GetTodoStatsPayload) (*todo.TodoStats, error) {
 			userID := middleware.GetUserID(c)
-			return h.todoService.GetTodoStats(c, userID)
+			return h.todoService.GetTodoStats(c, userID, payload)
 		},
 		http.StatusOK,
 		&todo.GetTodoStatsPayload{},

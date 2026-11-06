@@ -20,6 +20,8 @@ import (
 
 var errRepoBoom = errors.New("repo boom")
 
+func ptrBool(b bool) *bool { return &b }
+
 // validFileHeader returns a header that passes ValidateAttachment. The
 // attachment precondition tests fail before file.Open, so no body needed.
 func validFileHeader(_ *testing.T) *multipart.FileHeader {
@@ -410,25 +412,40 @@ func TestTodoService_GetTodoStats(t *testing.T) {
 	tests := []struct {
 		name      string
 		setup     func(tr *FakeTodoRepository)
+		payload   *todo.GetTodoStatsPayload
 		wantErr   string
 		wantTotal int
 	}{
 		{
-			name: "happy path",
+			name: "happy path with counts",
 			setup: func(tr *FakeTodoRepository) {
-				tr.GetTodoStatsFn = func(_ context.Context, _ string) (*todo.TodoStats, error) {
-					return &todo.TodoStats{Total: 5, Active: 3, Completed: 2}, nil
+				tr.GetTodoStatsFn = func(_ context.Context, _ string, _ bool) (*todo.TodoStats, error) {
+					return &todo.TodoStats{Total: 5, Active: 3, Completed: 2, DueThisWeek: 1, ByCategory: []todo.CategoryTodoCount{{Name: "work", Count: 5}}}, nil
 				}
 			},
+			payload:   &todo.GetTodoStatsPayload{},
 			wantTotal: 5,
+		},
+		{
+			name: "includeCounts false forwards false",
+			setup: func(tr *FakeTodoRepository) {
+				tr.GetTodoStatsFn = func(_ context.Context, userID string, includeCounts bool) (*todo.TodoStats, error) {
+					assert.False(t, includeCounts)
+					assert.Equal(t, "user-1", userID)
+					return &todo.TodoStats{Total: 2, ByCategory: []todo.CategoryTodoCount{}}, nil
+				}
+			},
+			payload:   &todo.GetTodoStatsPayload{IncludeCounts: ptrBool(false)},
+			wantTotal: 2,
 		},
 		{
 			name: "repo error propagates",
 			setup: func(tr *FakeTodoRepository) {
-				tr.GetTodoStatsFn = func(_ context.Context, _ string) (*todo.TodoStats, error) {
+				tr.GetTodoStatsFn = func(_ context.Context, _ string, _ bool) (*todo.TodoStats, error) {
 					return nil, errRepoBoom
 				}
 			},
+			payload: &todo.GetTodoStatsPayload{},
 			wantErr: "repo boom",
 		},
 	}
@@ -438,7 +455,7 @@ func TestTodoService_GetTodoStats(t *testing.T) {
 			todoRepo := &FakeTodoRepository{}
 			tt.setup(todoRepo)
 			svc := service.NewTodoService(nil, todoRepo, &FakeCategoryRepository{}, nil)
-			got, err := svc.GetTodoStats(newEchoCtx(), "user-1")
+			got, err := svc.GetTodoStats(newEchoCtx(), "user-1", tt.payload)
 			if tt.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.wantErr)

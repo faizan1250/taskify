@@ -612,7 +612,7 @@ func TestTodoRepository_GetTodoStats(t *testing.T) {
 	createTestTodos(t, ctx, todoRepo, userID, 5)
 
 	t.Run("get todo stats successfully", func(t *testing.T) {
-		result, err := todoRepo.GetTodoStats(ctx, userID)
+		result, err := todoRepo.GetTodoStats(ctx, userID, true)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -622,13 +622,24 @@ func TestTodoRepository_GetTodoStats(t *testing.T) {
 		assert.GreaterOrEqual(t, result.Completed, 0)
 		assert.GreaterOrEqual(t, result.Archived, 0)
 		assert.GreaterOrEqual(t, result.Overdue, 0)
+		assert.GreaterOrEqual(t, result.DueThisWeek, 0)
+		require.NotNil(t, result.ByCategory)
+	})
+
+	t.Run("includeCounts false skips per-category query", func(t *testing.T) {
+		result, err := todoRepo.GetTodoStats(ctx, userID, false)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		assert.GreaterOrEqual(t, result.Total, 5)
+		assert.NotNil(t, result.ByCategory)
+		assert.Empty(t, result.ByCategory)
 	})
 
 	t.Run("with canceled context", func(t *testing.T) {
 		canceledCtx, cancel := context.WithCancel(ctx)
 		cancel()
 
-		result, err := todoRepo.GetTodoStats(canceledCtx, userID)
+		result, err := todoRepo.GetTodoStats(canceledCtx, userID, true)
 		assert.Error(t, err)
 		assert.Nil(t, result)
 	})

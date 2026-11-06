@@ -1749,12 +1749,23 @@
     },
     "/v1/todos/stats": {
       "get": {
-        "description": "Get todo statistics",
+        "description": "Get todo statistics with due-this-week and per-category counts in 2 aggregate queries (no N+1). Pass includeCounts=false to skip the per-category query.",
         "summary": "Get todo statistics",
         "tags": [
           "Todo"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "includeCounts",
+            "in": "query",
+            "required": false,
+            "description": "Include per-category counts. Defaults to true; set false to skip the second aggregate query.",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+        ],
         "operationId": "getTodoStats",
         "responses": {
           "200": {
@@ -1781,6 +1792,33 @@
                     },
                     "overdue": {
                       "type": "number"
+                    },
+                    "dueThisWeek": {
+                      "type": "number",
+                      "description": "Non-completed/archived todos due within the next 7 days"
+                    },
+                    "byCategory": {
+                      "type": "array",
+                      "description": "Per-category totals (all statuses); categoryId null means uncategorized",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "count"
+                        ]
+                      }
                     }
                   },
                   "required": [
@@ -1789,7 +1827,9 @@
                     "active",
                     "completed",
                     "archived",
-                    "overdue"
+                    "overdue",
+                    "dueThisWeek",
+                    "byCategory"
                   ]
                 }
               }

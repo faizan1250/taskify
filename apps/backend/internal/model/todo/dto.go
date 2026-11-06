@@ -189,7 +189,7 @@ type BulkTodoFailure struct {
 
 // BulkUpdateTodosPayload applies Patch to every todo in IDs.
 type BulkUpdateTodosPayload struct {
-	IDs   []uuid.UUID  `json:"ids" validate:"required,min=1,max=100"`
+	IDs   []uuid.UUID   `json:"ids" validate:"required,min=1,max=100"`
 	Patch BulkTodoPatch `json:"patch"`
 }
 

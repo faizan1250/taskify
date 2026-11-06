@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { formatFileSize } from "@/lib/utils";
-import { Download, FileText, Trash2 } from "lucide-react";
+import { Download, FileText, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface TodoAttachmentsProps {
@@ -38,26 +38,41 @@ export function TodoAttachments({
   const deleteAttachment = useDeleteTodoAttachment();
   const getPresignedUrl = useGetTodoAttachmentPresignedUrl();
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
+  // Per-row pending ids — other rows stay interactive while one works.
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDownload = async (
     attachment: TGetTodoByIdResponse["attachments"][number],
   ) => {
+    setDownloadingId(attachment.id);
     try {
       const result = await getPresignedUrl.mutateAsync({
         todoId,
         attachmentId: attachment.id,
       });
 
-      // Open the presigned URL in a new tab to trigger download
-      window.open(result.url, "_blank");
+      // `window.open` returns null when the popup is blocked — say so
+      // instead of silently swallowing the download.
+      const win = window.open(result.url, "_blank", "noopener");
+      if (!win) {
+        toast.error(
+          "Popup blocked — allow popups for this site, then try again.",
+        );
+      }
     } catch (error) {
       console.error("Failed to download attachment:", error);
+    } finally {
+      setDownloadingId((current) =>
+        current === attachment.id ? null : current,
+      );
     }
   };
 
   const handleConfirmDelete = async () => {
     if (!pendingDelete) return;
 
+    setDeletingId(pendingDelete.id);
     try {
       await deleteAttachment.mutateAsync({
         todoId,
@@ -67,6 +82,8 @@ export function TodoAttachments({
       setPendingDelete(null);
     } catch (error) {
       console.error("Failed to delete attachment:", error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -84,69 +101,95 @@ export function TodoAttachments({
         <h4 className="text-sm font-medium">
           Current Attachments ({attachments.length})
         </h4>
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {attachments.map((attachment) => (
-            <div
-              key={attachment.id}
-              className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
-            >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className="text-sm font-medium truncate"
-                    title={attachment.name}
-                  >
-                    {attachment.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {attachment.fileSize
-                      ? formatFileSize(attachment.fileSize)
-                      : "Unknown size"}
-                    {attachment.mimeType &&
-                      ` • ${attachment.mimeType.split("/")[1].toUpperCase()}`}
-                  </p>
+        <ul
+          className="space-y-2 max-h-48 overflow-y-auto"
+          aria-label="Attachments"
+        >
+          {attachments.map((attachment) => {
+            const isDownloading = downloadingId === attachment.id;
+            const isDeleting = deletingId === attachment.id;
+            const rowBusy = isDownloading || isDeleting;
+            return (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <FileText
+                    className="h-5 w-5 text-muted-foreground flex-shrink-0"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-sm font-medium truncate"
+                      title={attachment.name}
+                    >
+                      {attachment.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {attachment.fileSize
+                        ? formatFileSize(attachment.fileSize)
+                        : "Unknown size"}
+                      {attachment.mimeType &&
+                        ` • ${attachment.mimeType.split("/")[1].toUpperCase()}`}
+                      {isDownloading && " • Preparing download…"}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDownload(attachment)}
-                  disabled={disabled || getPresignedUrl.isPending}
-                  title="Download attachment"
-                  aria-label={`Download attachment ${attachment.name}`}
-                >
-                  <Download className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setPendingDelete({
-                      id: attachment.id,
-                      name: attachment.name,
-                    })
-                  }
-                  disabled={disabled || deleteAttachment.isPending}
-                  className="text-destructive hover:text-destructive"
-                  title="Delete attachment"
-                  aria-label={`Delete attachment ${attachment.name}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(attachment)}
+                    disabled={disabled || rowBusy}
+                    title="Download attachment"
+                    aria-label={`Download attachment ${attachment.name}`}
+                  >
+                    {isDownloading ? (
+                      <Loader2
+                        className="h-4 w-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Download className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      setPendingDelete({
+                        id: attachment.id,
+                        name: attachment.name,
+                      })
+                    }
+                    disabled={disabled || rowBusy}
+                    className="text-destructive hover:text-destructive"
+                    title="Delete attachment"
+                    aria-label={`Delete attachment ${attachment.name}`}
+                  >
+                    {isDeleting ? (
+                      <Loader2
+                        className="h-4 w-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    )}
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <AlertDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => {
-          if (!open) setPendingDelete(null);
+          if (!open && deletingId === null) setPendingDelete(null);
         }}
       >
         <AlertDialogContent>
@@ -158,13 +201,18 @@ export function TodoAttachments({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingId !== null}>
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmDelete}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConfirmDelete();
+              }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={deleteAttachment.isPending}
+              disabled={deletingId !== null}
             >
-              {deleteAttachment.isPending ? "Deleting..." : "Delete"}
+              {deletingId !== null ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,9 +2,12 @@ import { type TApiClient, useApiClient } from "@/api";
 import { QUERY_KEYS } from "@/api/query-utils";
 import type { TRequests } from "@/api/types";
 import { showApiErrorToast } from "@/api/utils";
+import { env } from "@/config/env";
 import type { apiContract } from "@taskify/openapi/contracts";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import type { ServerInferResponseBody } from "@ts-rest/core";
+import axios from "axios";
 
 // Type definitions for Todo Attachment operations
 export type TUploadTodoAttachmentParams =
@@ -97,6 +100,74 @@ const getTodoAttachmentPresignedUrl = async ({
 };
 
 // React Query hooks
+/** Shared invalidation after any attachment write (upload/delete). */
+export const invalidateTodoAttachmentQueries = (
+  queryClient: QueryClient,
+  todoId: string,
+) => {
+  queryClient.invalidateQueries({
+    queryKey: [QUERY_KEYS.TODOS.GET_TODO_BY_ID, todoId],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [QUERY_KEYS.TODOS.TODO_ATTACHMENTS, todoId],
+  });
+  queryClient.invalidateQueries({
+    queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
+  });
+};
+
+export type TUploadProgress = {
+  loaded: number;
+  total: number;
+  /** 0–100 integer. */
+  percent: number;
+};
+
+/**
+ * Raw axios upload with real byte progress + cancellation. The ts-rest
+ * client has no `onUploadProgress`/`signal` surface, so per-file progress
+ * bars go through this instead of `uploadTodoAttachment`.
+ */
+export const uploadTodoAttachmentRaw = async ({
+  todoId,
+  file,
+  getToken,
+  onProgress,
+  signal,
+}: {
+  todoId: string;
+  file: File;
+  getToken: () => Promise<string | null>;
+  onProgress?: (progress: TUploadProgress) => void;
+  signal?: AbortSignal;
+}): Promise<TUploadTodoAttachmentResponse> => {
+  const token = await getToken();
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const res = await axios.post<TUploadTodoAttachmentResponse>(
+    `${env.VITE_API_URL}/api/v1/todos/${todoId}/attachments`,
+    formData,
+    {
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      signal,
+      onUploadProgress: (event) => {
+        const total = event.total ?? file.size;
+        const loaded = event.loaded;
+        onProgress?.({
+          loaded,
+          total,
+          percent:
+            total > 0 ? Math.min(100, Math.round((loaded / total) * 100)) : 0,
+        });
+      },
+    },
+  );
+  return res.data;
+};
+
 export const useUploadTodoAttachment = () => {
   const api = useApiClient();
   const queryClient = useQueryClient();
@@ -105,15 +176,7 @@ export const useUploadTodoAttachment = () => {
     mutationFn: ({ todoId, file }: { todoId: string; file: File }) =>
       uploadTodoAttachment({ api, todoId, file }),
     onSuccess: (_, { todoId }) => {
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.GET_TODO_BY_ID, todoId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.TODO_ATTACHMENTS, todoId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
-      });
+      invalidateTodoAttachmentQueries(queryClient, todoId);
     },
     onError: (err) => {
       showApiErrorToast(err, "Failed to upload attachment");
@@ -134,15 +197,7 @@ export const useDeleteTodoAttachment = () => {
       attachmentId: string;
     }) => deleteTodoAttachment({ api, todoId, attachmentId }),
     onSuccess: (_, { todoId }) => {
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.GET_TODO_BY_ID, todoId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.TODO_ATTACHMENTS, todoId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [QUERY_KEYS.TODOS.ALL_TODOS],
-      });
+      invalidateTodoAttachmentQueries(queryClient, todoId);
     },
     onError: (err) => {
       showApiErrorToast(err, "Failed to delete attachment");

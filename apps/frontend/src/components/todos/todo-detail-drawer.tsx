@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import axios from "axios";
 import { QUERY_KEYS } from "@/api/query-utils";
 import {
   useCreateTodo,
@@ -9,7 +11,10 @@ import {
   type TGetTodoByIdResponse,
   type TGetTodosResponse,
 } from "@/api/hooks/use-todo-query";
-import { useUploadTodoAttachment } from "@/api/hooks/use-todo-attachment-query";
+import {
+  invalidateTodoAttachmentQueries,
+  uploadTodoAttachmentRaw,
+} from "@/api/hooks/use-todo-attachment-query";
 import { isEditableTarget } from "@/lib/shortcuts";
 import { TodoCommentsPanel } from "./todo-comments-panel";
 import { TodoAttachments } from "./todo-attachments";
@@ -52,7 +57,6 @@ import {
   FileText,
   FileWarning,
   ListTree,
-  Loader2,
   MessageSquare,
   Paperclip,
   Plus,
@@ -78,6 +82,16 @@ const priorityMeta = {
 } as const;
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+type UploadEntry = {
+  key: number;
+  file: File;
+  status: "uploading" | "error";
+  /** Real byte progress, 0–100. */
+  progress: number;
+  /** Non-null while the request is in flight (cancel surface). */
+  controller: AbortController | null;
+};
 
 /**
  * Best-effort instant paint: when the drawer opens from a visible card,
@@ -727,29 +741,60 @@ function SubtasksTab({ todo }: { todo: TGetTodoByIdResponse }) {
 /* ----------------------------- Attachments tab ---------------------------- */
 
 function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
-  const uploadAttachment = useUploadTodoAttachment();
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadKey = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [uploads, setUploads] = useState<
-    { key: number; file: File; status: "uploading" | "error" }[]
-  >([]);
-  const busy = uploads.some((u) => u.status === "uploading");
+  const [uploads, setUploads] = useState<UploadEntry[]>([]);
+  // Progress events fire per chunk — cap state churn at ~10fps per entry.
+  const lastProgressAt = useRef(new Map<number, number>());
+
+  const setEntry = (key: number, patch: Partial<UploadEntry>) => {
+    setUploads((prev) =>
+      prev.map((u) => (u.key === key ? { ...u, ...patch } : u)),
+    );
+  };
 
   const uploadOne = async (key: number, file: File) => {
-    setUploads((prev) =>
-      prev.map((u) => (u.key === key ? { ...u, status: "uploading" as const } : u)),
-    );
+    const controller = new AbortController();
+    setEntry(key, { status: "uploading", progress: 0, controller });
     try {
-      await uploadAttachment.mutateAsync({ todoId: todo.id, file });
+      await uploadTodoAttachmentRaw({
+        todoId: todo.id,
+        file,
+        getToken,
+        signal: controller.signal,
+        onProgress: ({ percent }) => {
+          const now = Date.now();
+          const last = lastProgressAt.current.get(key) ?? 0;
+          if (percent >= 100 || now - last >= 100) {
+            lastProgressAt.current.set(key, now);
+            setEntry(key, { progress: percent });
+          }
+        },
+      });
+      lastProgressAt.current.delete(key);
       setUploads((prev) => prev.filter((u) => u.key !== key));
+      invalidateTodoAttachmentQueries(queryClient, todo.id);
       toast.success(`${file.name} uploaded`);
-    } catch {
-      setUploads((prev) =>
-        prev.map((u) => (u.key === key ? { ...u, status: "error" as const } : u)),
-      );
+    } catch (error) {
+      lastProgressAt.current.delete(key);
+      // User-cancelled: the row is already gone, stay silent.
+      if (axios.isCancel(error) || (error instanceof Error && error.name === "CanceledError")) {
+        return;
+      }
+      if (controller.signal.aborted) return;
+      setEntry(key, { status: "error", controller: null });
       toast.error(`Failed to upload ${file.name}`);
     }
+  };
+
+  const cancelUpload = (key: number) => {
+    const entry = uploads.find((u) => u.key === key);
+    entry?.controller?.abort();
+    lastProgressAt.current.delete(key);
+    setUploads((prev) => prev.filter((u) => u.key !== key));
   };
 
   const handleFiles = (files: File[]) => {
@@ -759,7 +804,10 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
         continue;
       }
       const key = ++uploadKey.current;
-      setUploads((prev) => [...prev, { key, file, status: "uploading" }]);
+      setUploads((prev) => [
+        ...prev,
+        { key, file, status: "uploading", progress: 0, controller: null },
+      ]);
       void uploadOne(key, file);
     }
   };
@@ -771,6 +819,10 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
     handleFiles(files);
   };
+
+  const activeUploads = uploads.filter(
+    (u) => u.status === "uploading",
+  ).length;
 
   return (
     <div className="space-y-4 p-4">
@@ -800,21 +852,17 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
           className="hidden"
           aria-label="Upload attachments"
           onChange={(e) => void handleFileSelect(e)}
-          disabled={busy}
         />
         <Button
           type="button"
           variant="outline"
           className="w-full border-dashed"
           onClick={() => fileInputRef.current?.click()}
-          disabled={busy}
         >
-          {busy ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Upload className="h-4 w-4 mr-2" />
-          )}
-          {busy ? "Uploading…" : "Upload files"}
+          <Upload className="h-4 w-4 mr-2" />
+          {activeUploads > 0
+            ? `Uploading ${activeUploads}… (add more)`
+            : "Upload files"}
         </Button>
         <p className="mt-1 text-[11px] text-muted-foreground">
           Max 10MB per file. Drag &amp; drop here or browse.
@@ -825,50 +873,81 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
           {uploads.map((u) => (
             <li
               key={u.key}
-              className="flex items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg"
+              className="space-y-2 p-3 bg-muted/50 rounded-lg"
             >
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                {u.status === "uploading" ? (
-                  <Loader2 className="h-5 w-5 text-muted-foreground flex-shrink-0 animate-spin" />
-                ) : (
-                  <FileText className="h-5 w-5 text-destructive flex-shrink-0" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate" title={u.file.name}>
-                    {u.file.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {u.status === "uploading"
-                      ? `Uploading… • ${formatFileSize(u.file.size)}`
-                      : `Upload failed • ${formatFileSize(u.file.size)}`}
-                  </p>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {u.status === "uploading" ? (
+                    <Upload
+                      className="h-5 w-5 text-muted-foreground flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <FileText
+                      className="h-5 w-5 text-destructive flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="text-sm font-medium truncate"
+                      title={u.file.name}
+                    >
+                      {u.file.name}
+                    </p>
+                    <p className="text-xs tabular-nums text-muted-foreground">
+                      {u.status === "uploading"
+                        ? `${u.progress}% • ${formatFileSize(u.file.size)}`
+                        : `Upload failed • ${formatFileSize(u.file.size)}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {u.status === "error" && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void uploadOne(u.key, u.file)}
+                      aria-label={`Retry upload ${u.file.name}`}
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {u.status === "uploading" ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => cancelUpload(u.key)}
+                      aria-label={`Cancel upload ${u.file.name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        setUploads((prev) =>
+                          prev.filter((x) => x.key !== u.key),
+                        )
+                      }
+                      aria-label={`Dismiss ${u.file.name}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {u.status === "error" && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void uploadOne(u.key, u.file)}
-                    aria-label={`Retry upload ${u.file.name}`}
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setUploads((prev) => prev.filter((x) => x.key !== u.key))
-                  }
-                  disabled={u.status === "uploading"}
-                  aria-label={`Dismiss ${u.file.name}`}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+              {u.status === "uploading" && (
+                <Progress
+                  value={u.progress}
+                  className="h-1.5"
+                  aria-label={`Uploading ${u.file.name}, ${u.progress} percent`}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -876,7 +955,6 @@ function AttachmentsTab({ todo }: { todo: TGetTodoByIdResponse }) {
       <TodoAttachments
         todoId={todo.id}
         attachments={todo.attachments ?? []}
-        disabled={busy}
       />
     </div>
   );

@@ -218,6 +218,101 @@ func (s *TodoService) DeleteTodo(ctx echo.Context, userID string, todoID uuid.UU
 	return nil
 }
 
+// dedupeUUIDs removes duplicate IDs while preserving input order so bulk
+// results never list the same row twice.
+func dedupeUUIDs(ids []uuid.UUID) []uuid.UUID {
+	seen := make(map[uuid.UUID]struct{}, len(ids))
+	out := make([]uuid.UUID, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	return out
+}
+
+// BulkUpdateTodos applies the same patch to many todos. The category is
+// validated once up front (object-level authz: it must belong to the
+// caller); per-row ownership is enforced inside the repository transaction
+// and reported per ID, so one foreign ID cannot fail the whole batch.
+func (s *TodoService) BulkUpdateTodos(ctx echo.Context, userID string, payload *todo.BulkUpdateTodosPayload) (*todo.BulkUpdateTodosResult, error) {
+	logger := middleware.GetLogger(ctx)
+	reqCtx := ctx.Request().Context()
+
+	if payload.Patch.CategoryID != nil {
+		if _, err := s.categoryRepo.GetCategoryByID(reqCtx, userID, *payload.Patch.CategoryID); err != nil {
+			logger.Error().Err(err).Msg("bulk update category validation failed")
+			return nil, err
+		}
+	}
+
+	ids := dedupeUUIDs(payload.IDs)
+
+	result, err := s.todoRepo.BulkUpdateTodos(reqCtx, userID, ids, &payload.Patch)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to bulk update todos")
+		return nil, err
+	}
+
+	middleware.GetLogger(ctx).Info().
+		Str("event", "todos_bulk_updated").
+		Int("updated", len(result.Updated)).
+		Int("failed", len(result.Failed)).
+		Msg("Todos bulk updated")
+
+	return result, nil
+}
+
+// BulkDeleteTodos deletes many todos. Attachment keys are collected first
+// (mirroring DeleteTodo, which fails fast when the lookup fails), the rows
+// are removed in one user-scoped transaction with per-ID misses reported,
+// and S3 cleanup runs asynchronously for the keys that were actually
+// deleted.
+func (s *TodoService) BulkDeleteTodos(ctx echo.Context, userID string, payload *todo.BulkDeleteTodosPayload) (*todo.BulkDeleteTodosResult, error) {
+	logger := middleware.GetLogger(ctx)
+	reqCtx := ctx.Request().Context()
+
+	ids := dedupeUUIDs(payload.IDs)
+
+	keysByTodo := make(map[uuid.UUID][]string, len(ids))
+	for _, id := range ids {
+		keys, err := s.todoRepo.GetAttachmentKeysForTodoAndSubtasks(reqCtx, userID, id)
+		if err != nil {
+			logger.Error().Err(err).Msg("failed to get attachment keys for bulk delete")
+			return nil, err
+		}
+		keysByTodo[id] = keys
+	}
+
+	result, err := s.todoRepo.BulkDeleteTodos(reqCtx, userID, ids)
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to bulk delete todos")
+		return nil, err
+	}
+
+	deletedSet := make(map[uuid.UUID]struct{}, len(result.Deleted))
+	for _, id := range result.Deleted {
+		deletedSet[id] = struct{}{}
+	}
+	var deletedKeys []string
+	for id, keys := range keysByTodo {
+		if _, ok := deletedSet[id]; ok {
+			deletedKeys = append(deletedKeys, keys...)
+		}
+	}
+	s.CleanupS3AttachmentsAsync(reqCtx, deletedKeys)
+
+	middleware.GetLogger(ctx).Info().
+		Str("event", "todos_bulk_deleted").
+		Int("deleted", len(result.Deleted)).
+		Int("failed", len(result.Failed)).
+		Msg("Todos bulk deleted")
+
+	return result, nil
+}
+
 // s3DeleteMaxAttempts bounds async S3 delete retries so a transient
 // failure does not permanently orphan an object.
 const s3DeleteMaxAttempts = 3

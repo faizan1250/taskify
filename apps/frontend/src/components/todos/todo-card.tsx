@@ -141,17 +141,23 @@ export function TodoCard({ todo, compact = false, onOpenDetails }: TodoCardProps
 
   const handleStatusToggle = async () => {
     const newStatus = todo.status === "completed" ? "active" : "completed";
-    await updateTodo.mutateAsync({
-      todoId: todo.id,
-      body: {
-        status: newStatus,
-      },
-    });
-    toast.success(
-      newStatus === "completed"
-        ? "Task marked as completed!"
-        : "Task marked as active",
-    );
+    try {
+      await updateTodo.mutateAsync({
+        todoId: todo.id,
+        body: {
+          status: newStatus,
+        },
+      });
+      toast.success(
+        newStatus === "completed"
+          ? "Task marked as completed!"
+          : "Task marked as active",
+      );
+    } catch {
+      // The mutation hook already rolls back the optimistic update and
+      // toasts the error — swallow here so the toggle never throws an
+      // unhandled rejection.
+    }
   };
 
   const handleDelete = async () => {

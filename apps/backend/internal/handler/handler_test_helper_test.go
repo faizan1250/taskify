@@ -112,6 +112,9 @@ type FakeTodoService struct {
 	UploadTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, file *multipart.FileHeader) (*todo.TodoAttachment, error)
 	DeleteTodoAttachmentFn      func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) error
 	GetAttachmentPresignedURLFn func(ctx echo.Context, userID string, todoID uuid.UUID, attachmentID uuid.UUID) (string, error)
+	ShareTodoFn                 func(ctx echo.Context, userID string, todoID uuid.UUID) (*todo.ShareTodoResult, error)
+	GetSharedTodoFn             func(ctx echo.Context, token string) (*todo.PopulatedTodo, error)
+	UnshareTodoFn               func(ctx echo.Context, userID string, todoID uuid.UUID) error
 }
 
 var _ handler.TodoServiceContract = (*FakeTodoService)(nil)
@@ -198,6 +201,27 @@ func (f *FakeTodoService) GetAttachmentPresignedURL(ctx echo.Context, userID str
 		return "", errFakeService
 	}
 	return f.GetAttachmentPresignedURLFn(ctx, userID, todoID, attachmentID)
+}
+
+func (f *FakeTodoService) ShareTodo(ctx echo.Context, userID string, todoID uuid.UUID) (*todo.ShareTodoResult, error) {
+	if f.ShareTodoFn == nil {
+		return nil, errFakeService
+	}
+	return f.ShareTodoFn(ctx, userID, todoID)
+}
+
+func (f *FakeTodoService) GetSharedTodo(ctx echo.Context, token string) (*todo.PopulatedTodo, error) {
+	if f.GetSharedTodoFn == nil {
+		return nil, errFakeService
+	}
+	return f.GetSharedTodoFn(ctx, token)
+}
+
+func (f *FakeTodoService) UnshareTodo(ctx echo.Context, userID string, todoID uuid.UUID) error {
+	if f.UnshareTodoFn == nil {
+		return errFakeService
+	}
+	return f.UnshareTodoFn(ctx, userID, todoID)
 }
 
 // ---------------------------------------------------------------------------

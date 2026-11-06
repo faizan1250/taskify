@@ -39,6 +39,7 @@ type Todo struct {
 	CategoryID        *uuid.UUID `json:"categoryId" db:"category_id"`
 	Metadata          *Metadata  `json:"metadata" db:"metadata"`
 	SortOrder         int        `json:"sortOrder" db:"sort_order"`
+	Position          float64    `json:"position" db:"position"`
 	Recurrence        Recurrence `json:"recurrence" db:"recurrence"`
 	NextRunAt         *time.Time `json:"nextRunAt" db:"next_run_at"`
 	ReminderSentAt    *time.Time `json:"reminderSentAt" db:"reminder_sent_at"`

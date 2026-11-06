@@ -38,6 +38,7 @@ type TodoRepositoryInterface interface {
 	GetTodoStatus(ctx context.Context, id uuid.UUID) (string, error)
 	GetDueRecurringTodos(ctx context.Context, now time.Time, limit int) ([]todo.Todo, error)
 	MaterializeRecurringTodos(ctx context.Context, now time.Time, limit int) (int, error)
+	ReorderTodos(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error)
 }
 
 type CategoryRepositoryInterface interface {

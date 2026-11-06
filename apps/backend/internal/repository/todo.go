@@ -1408,3 +1408,53 @@ func (r *TodoRepository) MaterializeRecurringTodos(ctx context.Context, now time
 
 	return materialized, nil
 }
+
+// ReorderTodos persists a drag order: every ID in orderedIDs gets
+// position = index (via todo.PositionsForOrder) inside a single transaction
+// scoped to userID. Any ID with no matching user-owned row aborts the whole
+// batch with a 404 so a partial order is never persisted — a foreign row
+// and a missing row are indistinguishable to the caller (no ownership
+// oracle). Only a hard DB error rolls the transaction back otherwise.
+// Returned todos preserve the caller-supplied order.
+func (r *TodoRepository) ReorderTodos(ctx context.Context, userID string, orderedIDs []uuid.UUID) ([]todo.Todo, error) {
+	positions := todo.PositionsForOrder(orderedIDs)
+
+	tx, err := r.server.DB.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin reorder transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	stmt := `UPDATE todos SET position = @position WHERE id = @id AND user_id = @user_id RETURNING *`
+
+	result := make([]todo.Todo, 0, len(orderedIDs))
+	for _, id := range orderedIDs {
+		rows, err := tx.Query(ctx, stmt, pgx.NamedArgs{
+			"id":       id,
+			"user_id":  userID,
+			"position": positions[id],
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to execute reorder query for todo_id=%s: %w", id.String(), err)
+		}
+
+		updated, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[todo.Todo])
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				code := "TODO_NOT_FOUND"
+				return nil, errs.NewNotFoundError("todo not found", false, &code)
+			}
+			return nil, fmt.Errorf("failed to collect reorder row for todo_id=%s: %w", id.String(), err)
+		}
+
+		result = append(result, updated)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("failed to commit reorder transaction: %w", err)
+	}
+
+	return result, nil
+}
